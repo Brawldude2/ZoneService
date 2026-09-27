@@ -7,7 +7,7 @@ Simple zone detection library with insane optimization.
 [Code](https://github.com/breadboardengineer1234/ZoneService/tree/main/benchmarks%20)
 
 ## Runtime Tests
-All tests are conducted with continuously moving entities. The are done with stationary zones.
+All tests are conducted with continuously moving entities. The first 4 tests are done with stationary zones.
 
 ### Light Test 1 (10K zones, 1 entity)
 | Library | FPS | Memory Usage (MB) |
