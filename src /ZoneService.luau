@@ -2,29 +2,25 @@
 --!native
 
 --[[
-u5eful's ZoneService v0.2.1
+u5eful's ZoneService v0.3.0
 
 Features:
 -Uses linear bvh tree for O(logN) zone query
 -Can distribute work across multiple frames to increase performance
 -Built in subject-centric and zone-centric signals
 -Supports multiple different shapes and rotated zones
--*Supports dynamic zones (cframe and size)
+-Supports dynamic zones (cframe and size)
 -Supports zone groups for independent zone signals
 -Priority system to resolve overlapping zones within the same group
 -Register subjects and zones with simple API
 
 For best performance:
 -Do not have many overlapping zones
--Attach fewer subjects (recommended < 100)
--Use a minimal # of dynamic zones (recommended < 20)
+-Track fewer subjects
+-Use a minimal # of dynamic zones (recommended < 1000)
 -Use a minimal # of zone groups (recommended < 20)
 -Use block zones with (0, 0, 0) orientation whenever possible
 -Use a polling interval > 1 frame (larger interval = better performance)
-
-*This module is designed mainly for static zones. Therefore, build cost of tree is somewhat high while query is
-very cheap. Since any time a zone changes position or size the tree needs to be rebuilt, dynamic zones are stored
-separately in a linear table. Therefore the scalability is low for dynamic zones.
 ]]
 
 local RunService = game:GetService("RunService")
@@ -42,6 +38,8 @@ const MAX_GROUPS = Config.MaxGroups
 const ENUM_BLOCK = Enums.Block
 const ENUM_BALL = Enums.Ball
 const ENUM_CYLINDER = Enums.Cylinder
+const ENUM_WEDGE = Enums.Wedge
+const ENUM_CORNERWEDGE = Enums.CornerWedge
 const ENUM_PLAYER = Enums.Player
 const ENUM_MODEL = Enums.Model
 const ENUM_OTHER = Enums.Other
@@ -54,6 +52,7 @@ type SubjectInfo = Types.SubjectInfo
 export type Shape = Types.Shape
 type Bucket = Types.Bucket
 export type ZoneService = Types.ZoneService
+type Tree = Types.Tree
 
 local function getFrameBuckets(numFrames: number, buckets: {Bucket}?): {Bucket}
 	if buckets then
@@ -84,9 +83,10 @@ local zoneId: number = 1 --start at 1
 local groupId: number  = 0 --start at 0
 local groupTracker: {[string]: number} = {}
 
+local numStaticZones: number = 0
+local numDynamicZones: number = 0
 local zones: {[string]: ZoneInfo} = {}
 local zonesById: {[number]: ZoneInfo} = {}
-local cachedZonesArray: {ZoneInfo}? = nil
 local dynamicZones: {[string]: ZoneInfo} = {}
 
 local subjects: {Bucket} = getFrameBuckets(numFrames)
@@ -94,8 +94,10 @@ local subjectsTracker: {[Subject]: SubjectInfo} = {}
 local subjectsFrameIdx: {[Subject]: number} = {}
 local bucketSizes: {number} = initBucketSizes(numFrames)
 
-local rebuildBVH: boolean = false
-local query: (pos: Vector3, results: {ZoneInfo}) -> () = BVH.query
+local rebuildStatic: boolean = false
+local rebuildDynamic: boolean = false
+local staticTree: Tree = BVH.new()
+local dynamicTree: Tree = BVH.new()
 
 local function getRadiusBall(size: Vector3): number
 	return math.min(size.X, size.Y, size.Z) * .5
@@ -112,15 +114,16 @@ end
 
 local function getRotatedBlockAABB(cframe: CFrame, size: Vector3): (Vector3, Vector3)
 	local half = size * 0.5
+	local halfX, halfY, halfZ = half.X, half.Y, half.Z
 	local right = cframe.RightVector
 	local up = cframe.UpVector
 	local look = cframe.LookVector
 	local pos = cframe.Position
 
 	local extent = Vector3.new(
-		math.abs(right.X) * half.X + math.abs(up.X) * half.Y + math.abs(look.X) * half.Z,
-		math.abs(right.Y) * half.X + math.abs(up.Y) * half.Y + math.abs(look.Y) * half.Z,
-		math.abs(right.Z) * half.X + math.abs(up.Z) * half.Y + math.abs(look.Z) * half.Z
+		math.abs(right.X) * halfX + math.abs(up.X) * halfY + math.abs(look.X) * halfZ,
+		math.abs(right.Y) * halfX + math.abs(up.Y) * halfY + math.abs(look.Y) * halfZ,
+		math.abs(right.Z) * halfX + math.abs(up.Z) * halfY + math.abs(look.Z) * halfZ
 	)
 	return pos - extent, pos + extent
 end
@@ -156,26 +159,48 @@ local function cylinderBoundsCheck(pos: Vector3, inverseCFrame: CFrame, radius2:
 	return math.abs(objectPos.X) <= halfHeight
 end
 
-local function getZonesArray(): {ZoneInfo}
-	if not rebuildBVH and cachedZonesArray ~= nil then
-		return cachedZonesArray
+local function wedgeBoundsCheck(point: Vector3, inverseCFrame: CFrame, slope: number, halfSize: Vector3): boolean
+	local localPoint = inverseCFrame:PointToWorldSpace(point)
+	local x, y, z = localPoint.X, localPoint.Y, localPoint.Z
+	local halfX, halfY, halfZ = halfSize.X, halfSize.Y, halfSize.Z
+	
+	if x < -halfX or x > halfX then
+		return false
 	end
 	
-	local zonesArray
-	if cachedZonesArray then
-		table.clear(cachedZonesArray)
-		zonesArray = cachedZonesArray
-	else
-		zonesArray = {}
-		cachedZonesArray = zonesArray
+	if z < -halfZ or z > halfZ then
+		return false
 	end
 	
-	local idx = 1
-	for _, info in zones do
-		zonesArray[idx] = info
-		idx += 1
+	if y < -halfY then
+		return false
+	end	
+	
+	local yMax = -halfY + (z + halfZ) * slope
+	return y <= yMax
+end
+
+local function cornerWedgeBoundsCheck(pos: Vector3, inverseCFrame: CFrame, slopeX: number, slopeZ: number,
+	halfSize: Vector3): boolean
+	local localPoint = inverseCFrame:PointToWorldSpace(pos)
+	local x, y, z = localPoint.X, localPoint.Y, localPoint.Z
+	local halfX, halfY, halfZ = halfSize.X, halfSize.Y, halfSize.Z
+
+	if x < -halfX or x > halfX then
+		return false
 	end
-	return zonesArray
+	
+	if y < -halfY or y > halfY then
+		return false
+	end
+	
+	if z < -halfZ or z > halfZ then
+		return false		
+	end
+
+	local yMaxX = -halfY + (x + halfX) * slopeX
+	local yMaxZ = -halfY + (halfZ - z) * slopeZ
+	return y <= yMaxX and y <= yMaxZ
 end
 
 local function getSmallestBucket(): number
@@ -205,14 +230,13 @@ local function getDimensionsCylinder(size: Vector3): (number, number)
 	return radius, height
 end
 
---block needs to update poslower/posupper for dynamic zones (other shapes dont)
 const identityRotation = CFrame.identity.Rotation
 
 local function updateBlock(cframe: CFrame, size: Vector3, info: ZoneInfo)
 	local axisAligned = cframe.Rotation == identityRotation
 	local halfSize = size / 2
 	info.HalfSize = halfSize
-	info.AxisAligned = axisAligned	
+	info.AxisAligned = axisAligned
 	local posUpper
 	local posLower
 	local position = cframe.Position
@@ -236,6 +260,7 @@ end
 
 local function updateBall(cframe: CFrame, size: Vector3, info: ZoneInfo)
 	local radius = getRadiusBall(size)
+	info.PosLower, info.PosUpper = getBallAABB(cframe, size)
 	info.Radius = radius
 	info.Radius2 = radius^2	
 	info.CFrame = cframe
@@ -244,6 +269,7 @@ end
 
 local function updateCylinder(cframe: CFrame, size: Vector3, info: ZoneInfo)
 	local radius, height = getDimensionsCylinder(size)
+	info.PosLower, info.PosUpper = getRotatedBlockAABB(cframe, size)
 	info.Radius = radius
 	info.Radius2 = radius^2
 	info.Height = height
@@ -251,6 +277,36 @@ local function updateCylinder(cframe: CFrame, size: Vector3, info: ZoneInfo)
 	info.CFrame = cframe
 	info.Pos = cframe.Position
 	info.InverseCFrame = cframe:Inverse()
+end
+
+local function updateWedge(cframe: CFrame, size: Vector3, info: ZoneInfo)
+	info.PosLower, info.PosUpper = getRotatedBlockAABB(cframe, size)
+	info.HalfSize = size / 2
+	info.Slope = size.Y / size.Z
+	info.CFrame = cframe
+	info.Pos = cframe.Position
+	info.InverseCFrame = cframe:Inverse()
+end
+
+local function updateCornerWedge(cframe: CFrame, size: Vector3, info: ZoneInfo)
+	info.PosLower, info.PosUpper = getRotatedBlockAABB(cframe, size)
+	info.HalfSize = size / 2
+	info.SlopeX = size.Y / size.X
+	info.SlopeZ = size.Y / size.Z
+	info.CFrame = cframe
+	info.Pos = cframe.Position
+	info.InverseCFrame = cframe:Inverse()
+end
+
+local function updateTreeBounds(tree: Tree, zones: {[string]: ZoneInfo})
+	local min = vector.create(math.huge, math.huge, math.huge)
+	local max = vector.create(-math.huge, -math.huge, -math.huge)
+
+	for _, zone in zones do
+		min = vector.min(zone.PosLower :: vector, min)
+		max = vector.max(zone.PosUpper :: vector, max)
+	end
+	tree:setBounds(min, max)
 end
 
 --API start
@@ -269,7 +325,7 @@ function Zone.addZone(self: ZoneService, zoneName: string, group: string, cframe
 	
 	local existingGroupId = groupTracker[group]
 	if not existingGroupId and groupId >= MAX_GROUPS then
-		warn(SOURCE.. "Failed to add zone "..zoneName..": exceeded max number of groups")
+		warn(SOURCE.. "Failed to add zone "..zoneName..": exceeded max number of groups ("..MAX_GROUPS..")")
 		return
 	end
 
@@ -280,18 +336,25 @@ function Zone.addZone(self: ZoneService, zoneName: string, group: string, cframe
 		
 	elseif shape == "Ball" then
 		info.Type = ENUM_BALL
-		info.PosLower, info.PosUpper = getBallAABB(cframe, size)
 		updateBall(cframe, size, info)
 		
-	elseif shape == "Cylinder" then		
+	elseif shape == "Cylinder" then
 		info.Type = ENUM_CYLINDER
-		info.PosLower, info.PosUpper = getRotatedBlockAABB(cframe, size)
 		updateCylinder(cframe, size, info)
+		
+	elseif shape == "Wedge" then
+		info.Type = ENUM_WEDGE
+		updateWedge(cframe, size, info)
+		
+	elseif shape == "CornerWedge" then
+		info.Type = ENUM_CORNERWEDGE
+		updateCornerWedge(cframe, size, info)
 		
 	else
 		warn(SOURCE.." Unsupported shape "..shape)
 		return
 	end
+	info.Size = size
 	
 	local dynamic = false
 	local priority = DEFAULT_PRIORITY
@@ -320,12 +383,16 @@ function Zone.addZone(self: ZoneService, zoneName: string, group: string, cframe
 	zonesById[zoneId] = info
 	zoneId += 1
 	if dynamic then
+		dynamicTree:updateBounds(info.PosLower, info.PosUpper)
 		dynamicZones[zoneName] = info
-		return
+		numDynamicZones += 1
+		rebuildDynamic = true
+		
+	else
+		zones[zoneName] = info
+		numStaticZones += 1
+		rebuildStatic = true
 	end
-	
-	zones[zoneName] = info
-	rebuildBVH = true
 end
 
 --[[
@@ -368,7 +435,11 @@ function Zone.removeZone(self: ZoneService, zoneName: string)
 	end
 	if exitSignal then exitSignal:DisconnectAll() end
 	if static then
-		rebuildBVH = true
+		rebuildStatic = true
+		numStaticZones -= 1
+	else
+		rebuildDynamic = true
+		numDynamicZones -= 1
 	end
 end
 
@@ -380,29 +451,37 @@ function Zone.cylinderSize(radius: number, height: number): Vector3
 	return Vector3.new(height, radius, radius)
 end
 
---[[
-Updates the CFrame and size of a zone (forces BVH rebuild if static)
-]]
-function Zone.updateZone(self: ZoneService, zoneName: string, cframe: CFrame, size: Vector3)
+function Zone.updateZone(self: ZoneService, zoneName: string, cframe: CFrame?, size: Vector3?)
 	local dynamic = dynamicZones[zoneName]
 	local static = zones[zoneName]
 	local info = dynamic or static
 	if not info then return end 
 	
+	cframe = cframe or info.CFrame
+	size = size or info.Size
 	local zoneType = info.Type
+	
 	if zoneType == ENUM_BLOCK then
 		updateBlock(cframe, size, info)	
 
 	elseif zoneType == ENUM_BALL then
-		info.PosLower, info.PosUpper = getBallAABB(cframe, size)
 		updateBall(cframe, size, info)
 
 	elseif zoneType == ENUM_CYLINDER then
-		info.PosLower, info.PosUpper = getRotatedBlockAABB(cframe, size)
 		updateCylinder(cframe, size, info)
+		
+	elseif zoneType == ENUM_WEDGE then
+		updateWedge(cframe, size, info)
+	
+	elseif zoneType == ENUM_CORNERWEDGE then
+		updateCornerWedge(cframe, size, info)
 	end
-	if static ~= nil then
-		rebuildBVH = true
+	
+	if static then
+		rebuildStatic = true
+	else
+		dynamicTree:updateBounds(info.PosLower, info.PosUpper)
+		rebuildDynamic = true
 	end
 end
 
@@ -411,7 +490,7 @@ Higher value = higher priority
 ]]
 function Zone.setPriority(self: ZoneService, zoneName: string, priority: number)
 	local info = zones[zoneName] or dynamicZones[zoneName]
-	if not info then end 
+	if not info then return end 
 	info.Priority = priority
 end
 
@@ -570,7 +649,7 @@ function Zone.exited(zoneName: string, callback: (subject: Subject) -> ()): Sign
 	return signal:Connect(callback)
 end
 
-function Zone.getSubjectsInZoneFlags(self: ZoneService, zoneName: string): {[Subject]: boolean}?
+function Zone.getSubjectsInZone(self: ZoneService, zoneName: string): {[Subject]: boolean}?
 	local zone = zones[zoneName] or dynamicZones[zoneName]
 	local zoneSubjects = zone and zone.Subjects
 	if not zoneSubjects then return end 
@@ -596,6 +675,12 @@ local function checkInZone(pos: Vector3, info: ZoneInfo): boolean
 
 	elseif zoneType == ENUM_CYLINDER then
 		inBounds = cylinderBoundsCheck(pos, info.InverseCFrame, info.Radius2, info.HalfHeight)
+	
+	elseif zoneType == ENUM_WEDGE then
+		inBounds = wedgeBoundsCheck(pos, info.InverseCFrame, info.Slope, info.HalfSize)
+	
+	elseif zoneType == ENUM_CORNERWEDGE then
+		inBounds = cornerWedgeBoundsCheck(pos, info.InverseCFrame, info.SlopeX, info.SlopeZ, info.HalfSize)
 	end
 	return inBounds
 end
@@ -605,7 +690,8 @@ Returns names of zones that intersect given point
 ]]
 function Zone.getZonesAtPoint(self: ZoneService, point: Vector3): {string}
 	local zones = {}
-	query(point, zones)
+	staticTree:query(point, zones)
+	dynamicTree:query(point, zones)
 	local finalZones = {}
 
 	for _, info in zones do
@@ -613,13 +699,6 @@ function Zone.getZonesAtPoint(self: ZoneService, point: Vector3): {string}
 			continue
 		end
 		table.insert(finalZones, info.Name)
-	end
-
-	for name, info in dynamicZones do
-		if not checkInZone(point, info) then
-			continue
-		end
-		table.insert(finalZones, name)
 	end
 	return finalZones
 end
@@ -655,11 +734,7 @@ function Zone.getRandomPointInZone(self: ZoneService, zoneName: string): Vector3
 		local theta = randomFloat(0, math.pi * 2)
 		local radial = math.sqrt(1 - z * z)
 		local distance = radius * math.random() ^ (1 / 3)
-		local point = Vector3.new(
-			radial * math.cos(theta),
-			z,
-			radial * math.sin(theta)
-		) * distance
+		local point = Vector3.new(radial * math.cos(theta), z, radial * math.sin(theta)) * distance
 		return cframe:PointToWorldSpace(point)
 
 	elseif shape == ENUM_CYLINDER then
@@ -671,16 +746,56 @@ function Zone.getRandomPointInZone(self: ZoneService, zoneName: string): Vector3
 		local distance = radius * math.sqrt(math.random())
 
 		local point = Vector3.new(
-			math.cos(theta) * distance,
 			randomFloat(-halfHeight, halfHeight),
+			math.cos(theta) * distance,
 			math.sin(theta) * distance
 		)
 		return cframe:PointToWorldSpace(point)
-	end
-end
+	
+	elseif shape == ENUM_WEDGE then
+		local halfSize = info.HalfSize
+		local halfX, halfY, halfZ = halfSize.X, halfSize.Y, halfSize.Z
+		local r1 = math.random()
+		local r2 = math.random()
+		if r1 + r2 > 1 then
+			r1 = 1 - r1
+			r2 = 1 - r2
+		end
+		
+		local x = (math.random() * 2 - 1) * halfX
+		local y = -halfY + r2 * (2 * halfY)
+		local z = -halfZ + (r1 + r2) * (2 * halfZ)
+		return info.CFrame:PointToWorldSpace(Vector3.new(x, y, z))
+		
+	elseif shape == ENUM_CORNERWEDGE then
+		local halfSize = info.HalfSize
+		local halfX, halfY, halfZ = halfSize.X, halfSize.Y, halfSize.Z	
+		local a = math.random()
+		local b = math.random()
+		local c = math.random()
+		
+		if a > b then
+			a, b = b, a
+		end
+		if b > c then
+			b, c = c, b
+		end
+		if a > b then
+			a, b = b, a
+		end
 
-function Zone.rebuildBVH(self: ZoneService)
-	rebuildBVH = true
+		local u, v
+		if math.random() < 0.5 then
+			u, v = b, c
+		else
+			u, v = c, b
+		end
+
+		local x = u * 2 * halfX - halfX
+		local y = a * 2 * halfY - halfY
+		local z = halfZ - v * 2 * halfZ
+		return info.CFrame:PointToWorldSpace(Vector3.new(x, y, z))
+	end
 end
 
 local function resolvePriority(zone: ZoneInfo, currZones: buffer)
@@ -700,16 +815,21 @@ end
 local deferred: boolean = false
 
 local function poll()
-	if rebuildBVH then
+	if rebuildStatic then
 		if not deferred then
 			deferred = true
 			return
 		end
-		local zonesArray = getZonesArray()
-		BVH.build(zonesArray)
-		rebuildBVH = false
+		updateTreeBounds(staticTree, zones)
+		staticTree:build(zones, numStaticZones)
+		rebuildStatic = false
 		deferred = false
 		return
+	end
+	
+	if rebuildDynamic then
+		dynamicTree:build(dynamicZones, numDynamicZones)
+		rebuildDynamic = false
 	end
 
 	for subject: Subject, subjectInfo: SubjectInfo in subjects[getFrameNum()] do
@@ -752,16 +872,10 @@ local function poll()
 
 		table.clear(subjCandidates)
 		buffer.fill(subjCurrZones, 0, 0)
-		query(pos, subjCandidates)
+		staticTree:query(pos, subjCandidates)
+		dynamicTree:query(pos, subjCandidates)
 
 		for _, info in subjCandidates do			
-			if not checkInZone(pos, info) then
-				continue
-			end
-			resolvePriority(info, subjCurrZones)
-		end
-
-		for _, info in dynamicZones do
 			if not checkInZone(pos, info) then
 				continue
 			end
@@ -825,6 +939,18 @@ function Zone.startPoll(self:ZoneService)
 	pollConnection = RunService.Heartbeat:Connect(poll)
 end
 
+function Zone.rebuildStaticBVH(self: ZoneService)
+	rebuildStatic = true
+end
+
+function Zone.rebuildDynamicBVH(self: ZoneService)
+	rebuildDynamic = true
+end
+
+function Zone.updateDynamicBounds(self: ZoneService)
+	updateTreeBounds(dynamicTree, dynamicZones)
+end
+
 function Zone.destroy(self: ZoneService)
 	self:stopPoll()
 	
@@ -841,10 +967,14 @@ function Zone.destroy(self: ZoneService)
 	end
 	
 	table.clear(groupTracker)
-	cachedZonesArray = nil	
 	zoneId = 1
 	groupId = 0
-	rebuildBVH = false
+	numStaticZones = 0
+	numDynamicZones = 0
+	rebuildStatic = false
+	rebuildDynamic = false
+	staticTree:reset()
+	dynamicTree:reset()
 	deferred = false
 end
 --API end
@@ -852,7 +982,3 @@ end
 pollConnection = RunService.Heartbeat:Connect(poll)
 
 return Zone
-
-
-
-
