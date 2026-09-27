@@ -115,7 +115,7 @@ Helper for getting a Vector3 size for a ball shape.
 local ballSize = ZoneService.ballSize(5)
 ```
 
-### ``.cylinderSize(radius: number): Vector3``
+### ``.cylinderSize(radius: number, height: number): Vector3``
 Helper for getting a Vector3 size for a cylinder shape. The size returned follows default cylinder orientation, i.e. height on the X axis.
 ```lua
 local cylinderSize = ZoneService.cylinderSize(5, 10)
