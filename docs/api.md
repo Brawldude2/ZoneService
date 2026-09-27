@@ -13,19 +13,21 @@ ZoneService:addZoneFromPart("ZoneB", "SafeZones", somePart, {Priority = 20, Dyna
 ```
 
 ### ``:removeZone(zoneName: string)``
-Cleans up the zone and disconnects its signals.
+Cleans up the zone, disconnects its signals, and schedules a BVH rebuild.
 ```lua
 ZoneService:removeZone("FightZone")
 ```
 
-### ``:updateZone(zoneName: string, cframe: CFrame, size: Vector3)``
-Updates the CFrame and size of the zone. If the zone is static, calling this method also schedules a BVH rebuild.
+### ``:updateZone(zoneName: string, cframe: CFrame?, size: Vector3?)``
+Updates the CFrame and/or size of the zone. Calling this method schedules a BVH rebuild on the next polling cycle.
 ```lua
-ZoneService:updateZone("FightZone", CFrame.new(), Vector3.new(1, 2, 3)) 
+ZoneService:updateZone("FightZone", CFrame.new(10, 10, 10), Vector3.new(1, 2, 3)) --updates both
+ZoneService:updateZone("FightZone", CFrame.new(10, 10, 10)) --updates only cframe
+ZoneService:updateZone("FightZone", nil, Vector3.new(1, 2, 3)) --updates only size
 ```
 
 ### ``:track(subject: Subject)``
-Registers the given subject for tracking.
+Registers the given subject for tracking. A subject can be a Player, BasePart, Model, Instance with Position property, or table with Position key.
 ```lua
 Players.PlayerAdded:Connect(function(player)
   ZoneService:track(player)
@@ -80,10 +82,10 @@ for _, zone in zones do
 end
 ```
 
-### ``:getSubjectsInZoneFlags(zoneName: string): {[Subject]: boolean}?``
-Returns a list of players in the given zone in the form of a dictionary with subject keys and boolean values. Note the flags don't mean anything since only subjects currently in the zone are keyed in the dictionary.
+### ``:getSubjectsInZone(zoneName: string): {[Subject]: boolean}?``
+Returns a list of players in the given zone in the form of a dictionary with subject keys and boolean values. Note the booleans don't mean anything since only subjects currently in the zone are keyed in the dictionary.
 ```lua
-local playersInLobby = ZoneService:getSubjectsInZoneFlags("LobbyZone")
+local playersInLobby = ZoneService:getSubjectsInZone("LobbyZone")
 for player, _ in playersInLobby do
   print(player.Name.." is in lobby")
 end
@@ -131,14 +133,26 @@ Stops scanning subjects and zones.
 ZoneService:stopPoll()
 ```
 
-### ``:rebuildBVH()``
-Schedules a BVH rebuild on the next rebuild cycle. BVH rebuild request is checked every heartbeat, and when detected, gets deferred to the following heartbeat.
+### ``:rebuildStaticBVH()``
+Schedules a static BVH rebuild on the next rebuild cycle. Static BVH rebuild request is checked every heartbeat, and when detected, gets deferred to the following heartbeat.
 ```lua
-ZoneService:rebuildBVH()
+ZoneService:rebuildStaticBVH()
+```
+
+### ``:rebuildDynamicBVH()``
+Schedules a dynamic BVH rebuild on the next rebuild cycle. Dymamic BVH rebuild request is checked every heartbeat, and when detected, rebuilds the tree immediately.
+```lua
+ZoneService:rebuildDynamicBVH()
+```
+
+### ``:updateDynamicBounds()``
+Recalculates the bounds that encompass all registered zones. This method should be called after a dynamic zone that's very far away from every other zone is removed or moved close to the others for the near future.
+```lua
+ZoneService:updateStaticBounds()
 ```
 
 ### ``:destroy()``
-Stops all ZoneService work and cleans up any allocations.
+Stops all ZoneService work and cleans up any allocations. Afterwards, ZoneService can be reused again as though it were required for the first time.
 ```lua
 ZoneService:destroy()
 ```
