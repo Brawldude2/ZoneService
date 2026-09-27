@@ -1,5 +1,6 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
 local packages = ReplicatedStorage.Scripts.Packages
 local ZoneService = require(packages.ZoneService)
 local ZonePlus = require(packages.ZonePlus)
@@ -20,6 +21,17 @@ local function getRandomPos(): Vector3
 		math.random(-RANGE, RANGE),
 		math.random(-RANGE, RANGE)
 	)
+end
+
+local function getRandomCFrame(rotated: boolean): CFrame
+	local angles
+	if rotated then
+		angles = CFrame.Angles(math.random() * math.pi, math.random() * math.pi, math.random() * math.pi)
+		return CFrame.new(math.random(-RANGE, RANGE), math.random(-RANGE, RANGE), math.random(-RANGE, RANGE))
+			* angles
+	end
+
+	return CFrame.new(math.random(-RANGE, RANGE), math.random(-RANGE, RANGE), math.random(-RANGE, RANGE))
 end
 
 local function getRandomAngles(): (number, number, number)
@@ -51,7 +63,7 @@ local function createAbstractSubjects(numSubjects: number): {{Position: Vector3}
 	return subjects
 end
 
-local function setupQuickZone(numSubjects: number, numZones: number, abstractSubjects: boolean?)
+local function setupQuickZone(numSubjects: number, numZones: number, abstractSubjects: boolean?, dynamic: boolean?)
 	: {BasePart} | {{Position: Vector3}}
 	QuickZone:setFrameBudget(1000000000)
 
@@ -64,30 +76,58 @@ local function setupQuickZone(numSubjects: number, numZones: number, abstractSub
 	local subjects = abstractSubjects and createAbstractSubjects(numSubjects) or createPartSubjects(numSubjects)
 	local entities = Group.new({autoClean = false, entities = subjects})
 
+	local zones = table.create(numZones) :: {QuickZone.Zone}
 	for i = 1, numZones do
-		local zone = Zone.new({cframe = CFrame.new(getRandomPos()), size = SIZE, shape = "Block"})
+		local zone = Zone.new({cframe = CFrame.new(getRandomPos()), size = SIZE, shape = "Block", isDynamic = dynamic})
 		observer:attach(zone)
 		broom:add(zone, "destroy")
+		zones[i] = zone
 	end
 	observer:subscribe(entities)
 	broom:add(entities, "destroy")
 	broom:add(observer, "destroy")
-	return subjects
+	
+	local function moveZones()
+		local elapsed = 0
+		for _, zone in zones do
+			local t0 = os.clock()
+			local cframe = getRandomCFrame()
+			elapsed += os.clock() - t0
+			zone:setCFrame(cframe)
+		end
+		return elapsed
+	end
+	return subjects, moveZones
 end
 
-local function setupZoneService(numSubjects: number, numZones: number, abstractSubjects: boolean?)
-	: {BasePart} | {{Position: Vector3}}
+local function setupZoneService(numSubjects: number, numZones: number, abstractSubjects: boolean?, dynamic: boolean?)
+	: ({BasePart} | {{Position: Vector3}}, () -> ())
 	local subjects = abstractSubjects and createAbstractSubjects(numSubjects) or createPartSubjects(numSubjects)
 	for _, subj in subjects do
 		ZoneService:track(subj)
 	end
-
+	
+	local keys = table.create(numZones) :: {string}
+	
 	for i = 1, numZones do
 		local key = "Zone"..i
-		ZoneService:addZone(key, GROUP, CFrame.new(getRandomPos()), SIZE, "Block")
+		ZoneService:addZone(key, GROUP, CFrame.new(getRandomPos()), SIZE, "Block", {Dynamic = dynamic})
+		keys[i] = key
 	end
 	broom:add(ZoneService, "destroy")
-	return subjects
+	
+	local function moveZones()
+		local elapsed = 0
+		for _, key in keys do
+			local t0 = os.clock()
+			local cframe = getRandomCFrame()
+			elapsed += os.clock() - t0
+			ZoneService:updateZone(key, cframe)
+		end
+		return elapsed
+	end
+	
+	return subjects, moveZones
 end
 
 local function setupZonePlus(numSubjects: number, numZones: number): {BasePart}
@@ -176,9 +216,9 @@ local setups = {
 	Zoner = setupZoner,
 }
 
-local function test(name: string, numSubjects: number, numZones: number, abstractSubjects: boolean?)
+local function test(name: string, numSubjects: number, numZones: number, abstractSubjects: boolean?, dynamic: boolean?)
 	local setup = setups[name] :: (numSubjects: number, numZones: number) -> ({BasePart} | {Position: Vector3})
-	local subjects = setup(numSubjects, numZones, abstractSubjects)
+	local subjects, moveZones = setup(numSubjects, numZones, abstractSubjects, dynamic)
 	local frameTime = 0
 	local timestamp
 	task.wait(5)
@@ -187,14 +227,20 @@ local function test(name: string, numSubjects: number, numZones: number, abstrac
 	local count = 0
 	
 	local conn = RunService.RenderStepped:Connect(function()
-		local t0 = os.clock()
+		local updTime = 0
 		
+		if dynamic then
+			updTime += moveZones()
+		end
+		
+		local t0 = os.clock()
 		for _, subject in subjects do
 			subject.Position = getRandomPos()
 		end
 		
+		
 		local now = os.clock()	
-		local updTime = now - t0
+		updTime += now - t0
 		
 		local elapsed = 0
 		if timestamp then
@@ -299,12 +345,18 @@ local function initZoneTest(name: string, numZones: number)
 	init(numZones)
 end
 
-local function bench(numSubjects: number, numZones: number, names: {string}, abstractSubjects: boolean?)
-	local header = string.format("==== Test [%d zones][%d entities] ====", numZones, numSubjects)
+local function bench(numSubjects: number, numZones: number, names: {string}, abstractSubjects: boolean?, dynamic: boolean?)
+	local header
+	
+	if dynamic then
+		header = string.format("==== Test [%d zones][%d entities][dynamic=true] ====", numZones, numSubjects)
+	else
+		header = string.format("==== Test [%d zones][%d entities] ====", numZones, numSubjects)
+	end
 	print(header)
 	for _, name in names do
 		task.wait(3)
-		test(name, numSubjects, numZones, abstractSubjects)
+		test(name, numSubjects, numZones, abstractSubjects, dynamic)
 		broom:cleanup()
 	end
 end
@@ -324,6 +376,10 @@ end
 
 local function heavyTest2()
 	bench(500, 1000000, {"ZoneService", "QuickZone"}, true)
+end
+
+local function heavyTest3()
+	bench(10000, 10000, {"ZoneService", "QuickZone"}, true, true)
 end
 
 --RUN (call functions here)
