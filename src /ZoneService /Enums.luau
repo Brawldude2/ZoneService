@@ -1,9 +1,11 @@
-return {
-	Block = 1,
-	Ball = 2,
-	Cylinder = 3,
+return {	
+	Player = 1,
+	Model = 2,
+	Other = 3,
 	
-	Player = 4,
-	Model = 5,
-	Other = 6,
+	Block = 10,
+	Ball = 11,
+	Cylinder = 12,
+	Wedge = 13,
+	CornerWedge = 14,
 }
