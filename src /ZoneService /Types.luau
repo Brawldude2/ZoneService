@@ -7,6 +7,28 @@ export type Params = {
 	Dynamic: boolean?,
 }
 
+export type Tree = {
+	nodeCount: number,
+	nextNode: number,
+	nodeMin: buffer,
+	nodeMax: buffer,
+	nodeSkip: buffer,
+	nodeZone: {ZoneInfo},
+
+	orderedZones: {ZoneInfo},
+	mortonCodes: {number},
+
+	minBound: vector,
+	maxBound: vector,
+	prevNodeCount: number,
+
+	build: (self: Tree, zones: {[string]: ZoneInfo}, numZones: number) -> (),
+	query: (self: Tree, pos: Vector3, results: {ZoneInfo}) -> (),
+	updateBounds: (self: Tree, min: Vector3, max: Vector3) -> (),
+	setBounds: (self: Tree, min: vector, max: vector) -> (),
+	reset: (self: Tree) -> (),
+}
+
 export type ZoneInfo = {
 	Type: number,
 	HalfSize: Vector3?,
@@ -17,8 +39,12 @@ export type ZoneInfo = {
 	Radius: number?,
 	Radius2: number?,
 	Height: number?,
-	HalfHeight: number?,	
-
+	HalfHeight: number?,
+	Slope: number?,
+	SlopeX: number?,
+	SlopeZ: number?,
+	
+	Size: Vector3,
 	CFrame: CFrame,
 	InverseCFrame: CFrame?,
 	Pos: Vector3,
@@ -49,7 +75,7 @@ export type SubjectInfo = {
 	ChangedSignals: {[number]: Signal<string?>}
 }
 
-export type Shape = "Block" | "Ball" | "Cylinder"
+export type Shape = "Block" | "Ball" | "Cylinder" | "Wedge" | "CornerWedge"
 
 export type Bucket = {[Subject]: SubjectInfo}
 
@@ -62,7 +88,7 @@ export type ZoneService = {
 	ballSize: (radius: number) -> Vector3,
 	cylinderSize: (radius: number, height: number) -> Vector3,
 	
-	updateZone: (self: ZoneService, zoneName: string, cframe: CFrame, size: Vector3) -> (),
+	updateZone: (self: ZoneService, zoneName: string, cframe: CFrame?, size: Vector3?) -> (),
 	setPriority: (self: ZoneService, zoneName: string, priority: number) -> (),
 	getZones: (self: ZoneService, subject: Subject) -> {string}?,
 	
@@ -74,12 +100,14 @@ export type ZoneService = {
 	entered: (zoneName: string, callback: (subject: Subject) -> ()) -> Signal.Connection<Subject>,
 	exited: (zoneName: string, callback: (subject: Subject) -> ()) -> Signal.Connection<Subject>,
 	
-	getSubjectsInZoneFlags: (self: ZoneService, zoneName: string) -> {[Subject]: boolean}?,
+	getSubjectsInZone: (self: ZoneService, zoneName: string) -> {[Subject]: boolean}?,
 	getZonesAtPoint: (self: ZoneService, point: Vector3) -> {string},
 	isPointInZone: (self: ZoneService, point: Vector3, zoneName: string) -> boolean,
 	getRandomPointInZone: (self: ZoneService, zoneName: string) -> Vector3?,
-	
-	rebuildBVH: (self: ZoneService) -> (),
+
+	updateDynamicBounds: (self: ZoneService) -> (),
+	rebuildStaticBVH: (self: ZoneService) -> (),
+	rebuildDynamicBVH: (self: ZoneService) -> (),
 	stopPoll: (self: ZoneService) -> (),
 	startPoll: (self: ZoneService) -> (),
 	destroy: (self: ZoneService) -> (),
