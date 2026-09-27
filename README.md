@@ -7,7 +7,7 @@ Simple zone detection library with insane optimization.
 [Code](https://github.com/breadboardengineer1234/ZoneService/tree/main/benchmarks%20)
 
 ## Runtime Tests
-All tests are conducted with stationary zones and continuously moving entities.
+All tests are conducted with continuously moving entities. The are done with stationary zones.
 
 ### Light Test 1 (10K zones, 1 entity)
 | Library | FPS | Memory Usage (MB) |
@@ -38,6 +38,13 @@ Only ZoneService and QuickZone are fast enough to handle the next 2 tests. The o
 |--------------------|------------------------|--------------------|
 | QuickZone | 12.91 | 1196.13
 | **ZoneService** | **65.05** | **889.26** 
+
+### Heavy Test 3 (10K dynamic zones, 10k entities entities)
+In this test the zones continuously move to different locations every frame.
+| Library | FPS | Memory Usage (MB) |
+|--------------------|------------------------|--------------------|
+| QuickZone | 14.90 | 28.62
+| **ZoneService** | **43.65** | **21.55** 
 
 ## Initialization Test
 Each library is used to register as many zones as possible without yielding until studio crashes.
