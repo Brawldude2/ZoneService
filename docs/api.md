@@ -146,7 +146,7 @@ ZoneService:rebuildDynamicBVH()
 ```
 
 ### ``:updateDynamicBounds()``
-Recalculates the bounds that encompass all registered zones. This method should be called after a dynamic zone that's very far away from every other zone is removed or moved close to the others for the near future.
+Recalculates the bounds that encompass all dynamic zones. This method should be called after a dynamic zone that's very far away from every other zone is removed or moved close to the others for the near future.
 ```lua
 ZoneService:updateStaticBounds()
 ```
