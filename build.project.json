@@ -1,0 +1,11 @@
+{
+  "name": "ZoneService",
+  "tree": {
+    "$path": "src",
+    "$properties": {
+      "Attributes": {
+        "Version": {"String": "0.3.0"}
+      }
+    }
+  }
+}
