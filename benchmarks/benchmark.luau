@@ -268,11 +268,7 @@ end
 local function initZoneService(numZones: number)
 	for i = 1, numZones do
 		local key = "Zone"..i
-		ZoneService:addZone(key, GROUP, CFrame.new(
-			math.random(-RANGE, RANGE), 
-			math.random(-RANGE, RANGE), 
-			math.random(-RANGE, RANGE)
-			), SIZE, "Block")
+		ZoneService:addZone(key, GROUP, CFrame.new(), SIZE, "Block")
 	end
 end
 
