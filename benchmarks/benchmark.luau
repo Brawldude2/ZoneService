@@ -173,7 +173,6 @@ local function setupSimplerZone(numSubjects: number, numZones: number): {BasePar
 		precision = "BoundingBox", 
 		queryShape = "Point"
 	})
-	
 	broom:add(track, "clear")
 	broom:add(listener, "cleanup")
 	
