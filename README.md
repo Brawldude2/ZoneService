@@ -39,7 +39,7 @@ Only ZoneService and QuickZone are fast enough to handle the following tests. Th
 | QuickZone | 12.91 | 1196.13
 | **ZoneService** | **65.05** | **889.26** 
 
-### Heavy Test 3 (10K dynamic zones, 10K entities entities)
+### Heavy Test 3 (10K dynamic zones, 10K entities)
 In this test the zones continuously move to different locations every frame.
 | Library | FPS | Memory Usage (MB) |
 |--------------------|------------------------|--------------------|
