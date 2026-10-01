@@ -156,5 +156,5 @@ end)
 ### `:getZones(): {Zone}`
 Returns a table containing the zone objects the entity is currently in. 
 
-### `.entity: Entity`
+### `.entity`
 A read only field that stores the entity associated with the `Tracked` object.
