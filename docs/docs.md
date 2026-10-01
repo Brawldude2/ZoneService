@@ -21,14 +21,14 @@ for i, part in workspace.Zones:GetChildren() do
 end
 
 Players.PlayerAdded:Connect(function(player)
-	local tracked = ZoneService:track(player)	
-	tracked:onZoneChange(zones, function(zone)
-		print(player.Name.." is in "..tostring(zone and zone.metadata))
-	end)
+  local tracked = ZoneService:track(player)	
+  tracked:onZoneChange(zones, function(zone)
+    print(player.Name.." is in "..tostring(zone and zone.metadata))
+  end)
 end)
 
 Players.PlayerRemoving:Connect(function(player)
-	ZoneService:untrack(player)
+  ZoneService:untrack(player)
 end)
 ```
 
