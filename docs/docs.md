@@ -142,7 +142,7 @@ A read only table that contains zone object keys and undefined values.
 A read only table that contains entity keys and undefined values.
 
 # Tracked
-### `:onZoneChange(group: Group, callback: (zone: Zone?) -> ()): Signal.Connection<Zone?>`
+### `:onZoneChange(group: Group, callback: (zone: Zone?) -> (), prefire: boolean?): Signal.Connection<Zone?>`
 Observe when the entity changes zones in the given group. Calling this method after the entity has been untracked will cause an error.
 ```lua
 local zones = ZoneService.Group.new()
