@@ -95,13 +95,13 @@ Recalculates the bounds that encompass all dynamic zones. This method should be 
 Stops all ZoneService work and cleans up any allocations. Afterwards, ZoneService can be reused again as though it were required for the first time.
 
 # Zone
-### `:onEnter(callback: (entity: Entity) -> ()): Signal.Connection<Entity>
+### `:onEnter(callback: (entity: Entity) -> ()): Signal.Connection<Entity>`
 Connects a signal that fires any time a tracked entity enters the zone.
 
-### `:onExit(callback: (entity: Entity) -> ()): Signal.Connection<Entity>
+### `:onExit(callback: (entity: Entity) -> ()): Signal.Connection<Entity>`
 Connects a signal that fires any time a tracked entity exits the zone.
 
-### `:update(cframe: CFrame?, size: Vector3?)
+### `:update(cframe: CFrame?, size: Vector3?)`
 Updates either the CFrame and/or size of the zone.
 
 ### `:isPointInside(point: Vector3): boolean`
@@ -146,5 +146,5 @@ Players.PlayerAdded:Connect(function(player)
   end)
 end)
 ```
-### `:getZones(): {Zone}
+### `:getZones(): {Zone}`
 Returns a table containing the zone objects the entity is currently in. 
