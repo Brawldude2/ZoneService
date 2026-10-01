@@ -102,7 +102,7 @@ Connects a signal that fires any time a tracked entity enters the zone.
 Connects a signal that fires any time a tracked entity exits the zone.
 
 ### `:update(cframe: CFrame?, size: Vector3?)`
-Updates either the CFrame and/or size of the zone.
+Updates the CFrame and/or size of the zone.
 
 ### `:isPointInside(point: Vector3): boolean`
 Checks if a point is inside the zone.
