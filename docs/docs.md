@@ -68,7 +68,7 @@ end)
 ```
 
 ### ``:getZonesAtPoint(point: Vector3): {Zone}``
-Returns a table of zones that intersect the given point. Unlike `:getZones`, this method queries the BVH.
+Returns a table of zones that intersect the given point. This method makes 2 BVH queries.
 
 ### ``.ballSize(radius: number): Vector3``
 Helper for getting a Vector3 size for a ball shape.
