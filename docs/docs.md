@@ -116,6 +116,9 @@ Sets the priority of the zone.
 ### `:destroy()`
 Cleans up the zone object and renders it unusable.
 
+### `.destroyed: boolean`
+A true/false flag that indicates if the zone object has been destroyed.
+
 ### `.metadata`
 A read and write field that can be used to attach arbitrary data to the zone.
 
