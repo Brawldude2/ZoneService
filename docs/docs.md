@@ -126,7 +126,7 @@ Attaches the zone to the group.
 Removes the zone from the group.
 
 ### `:destroy()`
-Removes all zones from the group and disconnects all `:onZoneChange` signals that observe the group.
+Removes all zones from the group, disconnects all `:onZoneChange` signals that observe the group, and renders the object unusable.
 
 ### `.zones`
 A read only table that contains zone object keys and undefined values.
