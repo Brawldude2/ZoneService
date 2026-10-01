@@ -110,6 +110,9 @@ Checks if a point is inside the zone.
 ### `:getRandomPointInside(): Vector3`
 Returns a uniform random point inside the zone.
 
+### `:setPriority(priority: number)`
+Sets the priority of the zone.
+
 ### `:destroy()`
 Cleans up the zone object and renders it unusable.
 
