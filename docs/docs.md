@@ -1,6 +1,8 @@
 ## ZoneService
 `Params`: {priority: number?, dynamic: number?, metadata: any}
+
 `Entity`: Player? | Instance | {Position: Vector3}
+
 `Shape`: "Block" | "Ball" | "Cylinder" | "Wedge" | "CornerWedge"
 
 ### `.new(cframe: CFrame, size: Vector3, shape: Shape, params: Params?): Zone`
