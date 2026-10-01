@@ -1,4 +1,38 @@
-## ZoneService
+# Usage Example
+```lua
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ZoneService = require(ReplicatedStorage.ZoneService)
+local Group = ZoneService.Group
+local zones = Group.new()
+
+for i, part in workspace.Zones:GetChildren() do
+  local zone = ZoneService.fromPart(part, {priority = 10, dynamic = false, metadata = "zone"..i}
+  zones:add(zone)
+
+  zone:onEnter(function(player)
+    print(player.Name.." entered zone!")
+    part.Color = Color3.new(0, 1, 0)
+  end
+
+  zone:onExit(function(player)
+    print(player.Name.." exited zone!")
+    part.Color = Color3.new(0, 0, 0)
+  end  
+end
+
+Players.PlayerAdded:Connect(function(player)
+	local tracked = ZoneService:track(player)	
+	tracked:onZoneChange(zones, function(zone)
+		print(player.Name.." is in "..tostring(zone and zone.metadata))
+	end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	ZoneService:untrack(player)
+end)
+```
+
+# ZoneService
 `Params`: {priority: number?, dynamic: number?, metadata: any}
 
 `Entity`: Player? | Instance | {Position: Vector3}
@@ -21,7 +55,7 @@ local zone = ZoneService.fromPart(workspace.ZonePart, {priority = 20, dynamic = 
 Registers the given entity for tracking and returns a `Tracked` handle.
 ```lua
 Players.PlayerAdded:Connect(function(player)
-  ZoneService:track(player)
+  local tracked = ZoneService:track(player)
 end)
 ```
 
@@ -35,54 +69,82 @@ end)
 
 ### ``:getZonesAtPoint(point: Vector3): {Zone}``
 Returns a table of zones that intersect the given point. Unlike `:getZones`, this method queries the BVH.
-```lua
-local zones = ZoneService:getZonesAtPoint(Vector3.new(1, 2, 3))
-```
 
 ### ``.ballSize(radius: number): Vector3``
 Helper for getting a Vector3 size for a ball shape.
-```lua
-local ballSize = ZoneService.ballSize(5)
-```
 
 ### ``.cylinderSize(radius: number, height: number): Vector3``
 Helper for getting a Vector3 size for a cylinder shape. The size returned follows default cylinder orientation, i.e. height on the X axis.
-```lua
-local cylinderSize = ZoneService.cylinderSize(5, 10)
-```
 
 ### ``:startsPoll()``
 Starts scanning subjects and zones (on by default).
-```lua
-ZoneService:startPoll()
-```
 
 ### ``:stopPoll()``
 Stops scanning subjects and zones.
-```lua
-ZoneService:stopPoll()
-```
 
 ### ``:rebuildStaticBVH()``
 Schedules a static BVH rebuild on the next rebuild cycle. Static BVH rebuild request is checked every heartbeat, and when detected, gets deferred to the following heartbeat.
-```lua
-ZoneService:rebuildStaticBVH()
-```
 
 ### ``:rebuildDynamicBVH()``
 Schedules a dynamic BVH rebuild on the next rebuild cycle. Dymamic BVH rebuild request is checked every heartbeat, and when detected, rebuilds the tree immediately.
-```lua
-ZoneService:rebuildDynamicBVH()
-```
 
 ### ``:updateDynamicBounds()``
 Recalculates the bounds that encompass all dynamic zones. This method should be called after a dynamic zone that's very far away from every other zone is removed or moved close to the others for the near future.
-```lua
-ZoneService:updateStaticBounds()
-```
 
 ### ``:destroy()``
 Stops all ZoneService work and cleans up any allocations. Afterwards, ZoneService can be reused again as though it were required for the first time.
+
+# Zone
+### `:onEnter(callback: (entity: Entity) -> ()): Signal.Connection<Entity>
+Connects a signal that fires any time a tracked entity enters the zone.
+
+### `:onExit(callback: (entity: Entity) -> ()): Signal.Connection<Entity>
+Connects a signal that fires any time a tracked entity exits the zone.
+
+### `:update(cframe: CFrame?, size: Vector3?)
+Updates either the CFrame and/or size of the zone.
+
+### `:isPointInside(point: Vector3): boolean`
+Checks if a point is inside the zone.
+
+### `:getRandomPointInside(): Vector3`
+Returns a uniform random point inside the zone.
+
+### `:destroy()`
+Cleans up the zone object and renders it unusable.
+
+### `.metadata`
+A read and write field that can be used to attach arbitrary data to the zone.
+
+# Group
+### `.new(): Group`
+
+### `:add(zone: Zone)`
+Attaches the zone to the group.
+
+### `:remove(zone: Zone)`
+Removes the zone from the group.
+
+### `:destroy()`
+Removes all zones from the group and disconnects all `:onZoneChange` signals that observe the group.
+
+### `.zones`
+A read only table that contains zone object keys and undefined values.
+
+### `.entities`
+A read only table that contains entity keys and undefined values.
+
+# Tracked
+### `:onZoneChange(group: Group, callback: (zone: Zone?) -> ()): Signal.Connection<Zone?>`
+Observe when the entity changes zones in the given group. Calling this method after the entity has been untracked will cause an error.
 ```lua
-ZoneService:destroy()
+local zones = ZoneService.Group.new()
+Players.PlayerAdded:Connect(function(player)
+  local tracked = ZoneService:track(player)
+  local conn = tracked:onZoneChange(group, function(zone)
+    print(player.Name.." is in "..tostring(zone and zone.metadata))
+  end)
+end)
 ```
+### `:getZones(): {Zone}
+Returns a table containing the zone objects the entity is currently in. 
