@@ -1,7 +1,7 @@
 ## ZoneService
-### `Params`: {priority: number?, dynamic: number?, metadata: any}
-### `Entity`: Player? | Instance | {Position: Vector3}
-### `Shape`: "Block" | "Ball" | "Cylinder" | "Wedge" | "CornerWedge"
+`Params`: {priority: number?, dynamic: number?, metadata: any}
+`Entity`: Player? | Instance | {Position: Vector3}
+`Shape`: "Block" | "Ball" | "Cylinder" | "Wedge" | "CornerWedge"
 
 ### `.new(cframe: CFrame, size: Vector3, shape: Shape, params: Params?): Zone`
 Add an abstract zone described by CFrame and size. If the zone moves or resizes frequently dynamic should be set to true for best performance. On the other hand, if the zone never or only rarely changes, set dynamic to false.
