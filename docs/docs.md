@@ -77,10 +77,10 @@ Helper for getting a Vector3 size for a ball shape.
 Helper for getting a Vector3 size for a cylinder shape. The size returned follows default cylinder orientation, i.e. height on the X axis.
 
 ### ``:startsPoll()``
-Starts scanning subjects and zones (on by default).
+Starts scanning entities and zones (on by default).
 
 ### ``:stopPoll()``
-Stops scanning subjects and zones.
+Stops scanning entities and zones.
 
 ### ``:rebuildStaticBVH()``
 Schedules a static BVH rebuild on the next rebuild cycle. Static BVH rebuild request is checked every heartbeat, and when detected, gets deferred to the following heartbeat.
