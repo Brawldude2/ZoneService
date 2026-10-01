@@ -124,7 +124,7 @@ A read and write field that can be used to attach arbitrary data to the zone.
 Creates a new Group object.
 
 ### `:add(zone: Zone)`
-Attaches the zone to the group.
+Adds the zone to the group. It's highly recommended the user does not add the same zone to multiple groups unless absolutely necessary.
 
 ### `:remove(zone: Zone)`
 Removes the zone from the group.
