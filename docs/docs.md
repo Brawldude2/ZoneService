@@ -145,7 +145,7 @@ Observe when the entity changes zones in the given group. Calling this method af
 local zones = ZoneService.Group.new()
 Players.PlayerAdded:Connect(function(player)
   local tracked = ZoneService:track(player)
-  local conn = tracked:onZoneChange(group, function(zone)
+  local conn = tracked:onZoneChange(zones, function(zone)
     print(player.Name.." is in "..tostring(zone and zone.metadata))
   end)
 end)
