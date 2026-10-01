@@ -6,7 +6,7 @@ local Group = ZoneService.Group
 local zones = Group.new()
 
 for i, part in workspace.Zones:GetChildren() do
-  local zone = ZoneService.fromPart(part, {priority = 10, dynamic = false, metadata = "zone"..i}
+  local zone = ZoneService.fromPart(part, {priority = 10, dynamic = false, metadata = "zone"..i})
   zones:add(zone)
 
   zone:onEnter(function(player)
