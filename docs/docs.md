@@ -121,7 +121,7 @@ A read and write field that can be used to attach arbitrary data to the zone.
 
 # Group
 ### `.new(): Group`
-Creates a new Group object.
+Creates a new Group object. Having too many groups can degrade the performance. It's recommended to use less than 10 groups.
 
 ### `:add(zone: Zone)`
 Adds the zone to the group. It's highly recommended the user does not add the same zone to multiple groups unless absolutely necessary.
