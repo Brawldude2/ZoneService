@@ -3,8 +3,9 @@ local Signal = require(script.Parent.UsefulSignal)
 export type Signal<T...> = Signal.Signal<T...>
 
 export type Params = {
-	Priority: number?,
-	Dynamic: boolean?,
+	priority: number?,
+	dynamic: boolean?,
+	metadata: any,
 }
 
 export type Tree = {
@@ -22,7 +23,7 @@ export type Tree = {
 	maxBound: vector,
 	prevNodeCount: number,
 
-	build: (self: Tree, zones: {[string]: ZoneInfo}, numZones: number) -> (),
+	build: (self: Tree, zones: {[ZoneInfo]: boolean}, numZones: number) -> (),
 	query: (self: Tree, pos: Vector3, results: {ZoneInfo}) -> (),
 	updateBounds: (self: Tree, min: Vector3, max: Vector3) -> (),
 	setBounds: (self: Tree, min: vector, max: vector) -> (),
@@ -49,68 +50,60 @@ export type ZoneInfo = {
 	InverseCFrame: CFrame?,
 	Pos: Vector3,
 
-	ZoneId: number,
-	GroupId: number,
-	Name: string,
-	Group: string,
+	Groups: {Group},
 	Priority: number,
 	Dynamic: boolean,
+	metadata: any,
+	destroyed: boolean,
 	
-	EnteredSignal: Signal<Subject>?,
-	ExitedSignal: Signal<Subject>?,
-	Subjects: {[Subject]: boolean},
+	EnteredSignal: Signal<Entity>?,
+	ExitedSignal: Signal<Entity>?,
 }
 
-export type Subject = Player | Instance | {Position: Vector3}
+export type Zone = {
+	destroyed: boolean,
+	metadata: any,
+	isPointInside: (self: Zone, point: Vector3) -> boolean,
+	getRandomPointInside: (self: Zone) -> Vector3,
+	setPriority: (self: Zone, priority: number) -> (),
+	update: (self: Zone, cframe: CFrame?, size: Vector3?) -> (),
+	onEnter: (self: Zone, callback: (entity: Entity) -> ()) -> Signal.Connection<Entity>,
+	onExit: (self: Zone, callback: (entity: Entity) -> ()) -> Signal.Connection<Entity>,
+	destroy: (self: Zone) -> (),
+}
 
-export type SubjectInfo = {
+export type Group = {
+	zones: {[Zone]: number},
+	entities: {[Entity]: EntityInfo},
+	
+	add: (self: Group, zone: Zone) -> (),
+	remove: (self: Group, zone: Zone) -> (),
+	destroy: (self: Group) -> (),
+}
+
+export type Entity = Player? | Instance | {Position: Vector3}
+
+export type EntityInfo = {
 	Type: number,
 	Active: boolean,
 	Char: Model?,
 	RootPart: BasePart?,
 	
 	Candidates: {ZoneInfo},
-	CurrZones: buffer,
-	PrevZones: buffer,
-	ChangedSignals: {[number]: Signal<string?>}
+	CurrZones: {[Group]: ZoneInfo},
+	PrevZones: {[Group]: ZoneInfo},
+	ChangedSignals: {[Group]: Signal<Zone?>},
+}
+
+export type Tracked = {
+	entity: Entity,
+	onZoneChange: (self: Tracked, group: Group, callback: (zone: Zone?) -> (), prefire: boolean?) -> 
+	Signal.Connection<Zone?>,
+	getZones: (self: Tracked) -> {Zone},
 }
 
 export type Shape = "Block" | "Ball" | "Cylinder" | "Wedge" | "CornerWedge"
 
-export type Bucket = {[Subject]: SubjectInfo}
+export type Bucket = {[Entity]: EntityInfo}
 
-export type ZoneService = {
-	addZone: (self: ZoneService, zoneName: string, group: string, cframe: CFrame, size: Vector3, shape: Shape,
-		params: Params?) -> (),
-	addZoneFromPart: (self: ZoneService, zoneName: string, group: string, part: BasePart, params: Params?) -> (),
-	removeZone: (self: ZoneService, zoneName: string) -> (),
-	
-	ballSize: (radius: number) -> Vector3,
-	cylinderSize: (radius: number, height: number) -> Vector3,
-	
-	updateZone: (self: ZoneService, zoneName: string, cframe: CFrame?, size: Vector3?) -> (),
-	setPriority: (self: ZoneService, zoneName: string, priority: number) -> (),
-	getZones: (self: ZoneService, subject: Subject) -> {string}?,
-	
-	track: (self: ZoneService, subject: Subject) -> (),
-	untrack: (self: ZoneService, subject: Subject) -> (),
-	
-	changed: (subject: Subject, group: string, callback: (zoneName: string?) -> (), prefire: boolean?
-	) -> Signal.Connection<string?>,
-	entered: (zoneName: string, callback: (subject: Subject) -> ()) -> Signal.Connection<Subject>,
-	exited: (zoneName: string, callback: (subject: Subject) -> ()) -> Signal.Connection<Subject>,
-	
-	getSubjectsInZone: (self: ZoneService, zoneName: string) -> {[Subject]: boolean}?,
-	getZonesAtPoint: (self: ZoneService, point: Vector3) -> {string},
-	isPointInZone: (self: ZoneService, point: Vector3, zoneName: string) -> boolean,
-	getRandomPointInZone: (self: ZoneService, zoneName: string) -> Vector3?,
-
-	updateDynamicBounds: (self: ZoneService) -> (),
-	rebuildStaticBVH: (self: ZoneService) -> (),
-	rebuildDynamicBVH: (self: ZoneService) -> (),
-	stopPoll: (self: ZoneService) -> (),
-	startPoll: (self: ZoneService) -> (),
-	destroy: (self: ZoneService) -> (),
-}
-
-return {}
+return nil
