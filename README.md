@@ -4,7 +4,7 @@ Simple zone detection library with insane optimization.
 [Documentation](https://github.com/breadboardengineer1234/ZoneService/blob/main/docs/docs.md)
 
 # Benchmarks
-[Code](https://github.com/breadboardengineer1234/ZoneService/tree/main/benchmarks%20)
+[Code](https://github.com/breadboardengineer1234/ZoneService/tree/main/benchmarks)
 
 ## Runtime Tests
 All tests are conducted with continuously moving entities. The first 4 tests are done with stationary zones.
