@@ -1,5 +1,6 @@
 --!optimize 2
 --!native
+--!strict
 
 export type Connection<T...> = {
 	Connected: boolean,
@@ -85,7 +86,7 @@ local function disconnectAll<T...>(self: Signal<T...>)
 end
 
 local function once<T...>(self: Signal<T...>, callback: (T...) -> ()): Connection<T...>
-	local conn 
+	local conn : Connection<T...>
 	conn = connect(self, function(...)
 		disconnect(conn)
 		callback(...)
@@ -95,7 +96,7 @@ end
 
 local function wait<T...>(self: Signal<T...>): T...
 	local cor = coroutine.running()
-	local conn
+	local conn : Connection<T...>
 	conn = connect(self, function(...)
 		disconnect(conn)
 		if coroutine.status(cor) == "suspended" then

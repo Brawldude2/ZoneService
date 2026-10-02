@@ -1,5 +1,6 @@
 --!optimize 2
 --!native
+--!strict
 
 local Types = require(script.Parent.Types)
 local Enums = require(script.Parent.Enums)
@@ -13,7 +14,7 @@ const ENUM_CYLINDER = Enums.Cylinder
 const MORTON_RANGE = 1023
 
 local function createSpreadLookup(): {number}
-	local spread = table.create(MORTON_RANGE + 1)
+	local spread = table.create(MORTON_RANGE + 1) :: {number}
 	local maxBit = math.log(MORTON_RANGE + 1, 2)
 	
 	for i = 0, MORTON_RANGE do
@@ -70,7 +71,7 @@ local function quickSort(mortonCodes: {number}, orderedZones: {ZoneInfo}, low: n
 	end
 end
 
-local function computeMorton(self: Tree, zones: {[string]: ZoneInfo}, numZones: number): {number}
+local function computeMorton(self: Tree, zones: {[ZoneInfo]: boolean}, numZones: number): {number}
 	local min, max = self.minBound, self.maxBound
 	local minX, minY, minZ, maxX, maxY, maxZ = min.x, min.y, min.z, max.x, max.y, max.z	
 	local xScale = min.x == max.x and 0 or MORTON_RANGE / (max.x - min.x)
@@ -81,7 +82,7 @@ local function computeMorton(self: Tree, zones: {[string]: ZoneInfo}, numZones: 
 	local mortonCodes = self.mortonCodes
 	local idx = 1
 	
-	for _, zone in zones do
+	for zone, _ in zones do
 		local pos = zone.Pos
 		local x, y, z = 
 			math.clamp(math.floor((pos.X - minX) * xScale), 0, MORTON_RANGE),
@@ -100,13 +101,13 @@ local function allocateCaches(self: Tree, numZones: number)
 	if self.orderedZones then
 		table.clear(self.orderedZones)
 	else
-		self.orderedZones = table.create(numZones)
+		self.orderedZones = table.create(numZones) :: {ZoneInfo}
 	end
 
 	if self.mortonCodes then
 		table.clear(self.mortonCodes)
 	else
-		self.mortonCodes = table.create(numZones)
+		self.mortonCodes = table.create(numZones) :: {number}
 	end
 end
 
@@ -121,7 +122,7 @@ local function allocateNodes(self: Tree, nodeCount: number)
 	self.nodeMin = buffer.create(nodeCount * 12)
 	self.nodeMax = buffer.create(nodeCount * 12)
 	self.nodeSkip = buffer.create(nodeCount * 4)
-	self.nodeZone = table.create(nodeCount)
+	self.nodeZone = table.create(nodeCount) :: {ZoneInfo}
 end
 
 local function findSplit(morton: {number}, start: number, finish: number): number
@@ -220,7 +221,7 @@ local function buildTree(self: Tree, morton: {number}, start: number, finish: nu
 	return node, endIdx, minX, minY, minZ, maxX, maxY, maxZ
 end
 
-local function build(self: Tree, zones: {[string]: ZoneInfo}, numZones: number)
+local function build(self: Tree, zones: {[ZoneInfo]: boolean}, numZones: number)
 	if numZones < 1 then
 		self.nodeCount = 0
 		return 
@@ -268,8 +269,8 @@ local function query(self: Tree, pos: Vector3, results: {ZoneInfo})
 end
 
 local function updateBounds(self: Tree, min: Vector3, max: Vector3)
-	self.minBound = vector.min(min :: vector, self.minBound)
-	self.maxBound = vector.max(max :: vector, self.maxBound)
+	self.minBound = vector.min(min :: any, self.minBound)
+	self.maxBound = vector.max(max :: any, self.maxBound)
 end
 
 local function setBounds(self: Tree, min: vector, max: vector)
