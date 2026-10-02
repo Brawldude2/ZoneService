@@ -1,7 +1,7 @@
 # ZoneService
 Simple zone detection library with insane optimization.
 
-[Documentation](https://github.com/breadboardengineer1234/ZoneService/blob/main/docs/api.md)
+[Documentation](https://github.com/breadboardengineer1234/ZoneService/blob/main/docs/docs.md)
 
 # Benchmarks
 [Code](https://github.com/breadboardengineer1234/ZoneService/tree/main/benchmarks%20)
