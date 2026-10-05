@@ -5,8 +5,6 @@ Simple zone detection library with insane optimization.
 
 # Benchmarks
 [Code](https://github.com/breadboardengineer1234/ZoneService/tree/main/benchmarks)
-
-## Runtime Tests
 All tests are conducted with continuously moving entities. The first 4 tests are done with stationary zones.
 
 ### Light Test 1 (10K zones, 1 entity)
@@ -27,6 +25,7 @@ All tests are conducted with continuously moving entities. The first 4 tests are
 | **ZoneService** | **240.00** | **4.29** 
 
 Only ZoneService and QuickZone are fast enough to handle the following tests. The other libraries cause studio to crash. For all intents and purposes their FPS can be considered 0.
+## ZoneService Perfermance Mode Off
 ### Heavy Test 1 (10K zones, 10K entities)
 | Library | FPS | Memory Usage (MB) |
 |--------------------|------------------------|--------------------|
@@ -45,6 +44,26 @@ In this test the zones continuously move to different locations every frame.
 |--------------------|------------------------|--------------------|
 | QuickZone | 14.90 | 28.62
 | **ZoneService** | **43.65** | **21.55** 
+
+## ZoneService Performance Mode On
+### Heavy Test 1 (10K zones, 10K entities)
+| Library | FPS | Effective Poll Rate (Hz) |
+|--------------------|------------------------|--------------------|
+| QuickZone | 21.30 | 21.30
+| **ZoneService** | **221.90** | **28.54** 
+
+### Heavy Test 2 (1M zones, 500 entities)
+| Library | FPS | Effective Poll Rate (Hz) |
+|--------------------|------------------------|--------------------|
+| QuickZone | 12.91 | 12.91
+| **ZoneService** | **182.31** | **21.63** 
+
+### Heavy Test 3 (10K dynamic zones, 10K entities)
+In this test the zones continuously move to different locations every frame.
+| Library | FPS | Effective Poll Rate (Hz) |
+|--------------------|------------------------|--------------------|
+| QuickZone | 14.90 | 14.90
+| **ZoneService** | **54.05** | **16.49** 
 
 ## Initialization Test
 Each library is used to register as many zones as possible without yielding until studio crashes.
