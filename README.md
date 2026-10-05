@@ -4,15 +4,15 @@ Simple zone detection library with insane optimization.
 [Documentation](https://github.com/breadboardengineer1234/ZoneService/blob/main/docs/docs.md)
 
 # Benchmarks
-All tests are conducted with continuously moving entities. The first 4 tests are done with stationary zones. ZoneService and QuickZone are both run with a 30 Hz polling rate, Zoner is set to Immediate rate, ZonePlus is set to Precise rate, and SimplerZone is left at default. See [code](https://github.com/breadboardengineer1234/ZoneService/tree/main/benchmarks) for more details.
+All tests are conducted with continuously moving entities. The first 4 tests are done with stationary zones. ZoneService and QuickZone are both run with a 30 Hz polling rate, Zoner is set to a custom added "Faster" rate that's 30 Hz with Parallel execution turned on, ZonePlus is set to Precise rate, and SimplerZone is left at default. See [code](https://github.com/breadboardengineer1234/ZoneService/tree/main/benchmarks) for more details.
 
 ## ZoneService Perfermance Mode Off
 ### Light Test 1 (10K zones, 1 entity)
 | Library | FPS | Memory Usage (MB) |
 |--------------------|------------------------|--------------------|
-| ZonePlus | 37.67 | 129.17
-| Zoner | 40.82 | 141.16
-| SimplerZone | 64.11 | 30.75
+| ZonePlus | 38.38 | 129.17
+| Zoner | 55.15 | 141.16
+| SimplerZone | 64.67 | 30.75
 | QuickZone | 240.00 | 15.98
 | **ZoneService** | **240.00** | **12.18** 
 
