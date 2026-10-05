@@ -45,7 +45,7 @@ In this test the zones continuously move to different locations every frame.
 | **ZoneService** | **41.43** | **21.55** 
 
 ## ZoneService Performance Mode On
-Effective polling rate is the true polling rate. I wrote some special code in the backend of ZoneService that records the average number of visits of a random bucket during polling. This metric gives us the true polling rate when performance mode is on. For QuickZone no special code is needed as the true polling rate cannot be above the FPS.
+Effective polling rate is the true polling rate. For ZoneService the results are obtained by recording the average number of visits of a random bucket during polling. For QuickZone the true polling rate is simply the FPS since it's below 30 FPS in the tests, and it's not possible to poll at a rate higher than the FPS.
 
 ### Heavy Test 1 (10K zones, 10K entities)
 | Library | FPS | Effective Poll Rate (Hz) |
@@ -89,10 +89,7 @@ Unlike the other libraries Zoner only supports tracking players, making it impos
 A similar accommodation was made for ZonePlus. Furthermore, ZonePlus is different than the other libraries in that it doesn't actually scan unless signals are connected for each zone. Therefore, I connected .ItemExited signals during ZonePlus's setup. Note ZonePlus has a tendency to crash studio on cleanup, so it's important it always runs last in the tests so we can leave it uncleaned without it affecting other zone libraries.
 
 ### Why only QuickZone and ZoneService are included in heavy tests
-The other 3 libraries are simply too slow to handle these tests. No amount of task.wait()'s or other tricks can save them from running out of execution time during initialization. Even if they got past it, they would still crash studio during runtime. QuickZone and ZoneService are orders of magnitude faster than the other 3, to an extent not captured by the light tests. In fact, the main point of the heavy tests is to observe the performance difference between the two, as the light tests don't have enough load to tell them apart.
-
-### Polling Rate
-Note different zone modules handle polling differently. For example, QuickZone has a time-based polling system, while ZoneService has a frame-based one. In order to make the tests fair each zone library was configured such that they have similar polling frequencies (to the extent it's possible). For example, ZonePlus was configured with a precision (its version of polling rate) of Precise despite having a default precision of High. Based on testing, ZonePlus polls at ~7Hz with the default High setting in the benchmarks, which is far too low and gives it an unfair advantage. However, when using the Precise setting it polls at ~28 hz, which is more in line with the other libraries. Likewise, QuickZone was configured with a 30hz polling rate. However, in order to give other libraries the benefit of doubt, ZoneService was run with a 2-frame polling interval. This configuration means that ZoneService was polling more frequently than other libraries across the board. Specifically, at 240 FPS ZoneService was polling at 120hz, at 80 FPS 40hz, etc. In other words, the actual performance of ZoneService is even higher than that shown in the tests.
+The other 3 libraries are simply too slow to handle these tests. No amount of task.wait()'s or other tricks can save them from running out of execution time during initialization. Even if they got past it, they would still crash studio during runtime. QuickZone and ZoneService are orders of magnitude faster than the other 3, to an extent not captured by the light tests.
 
 ### Memory Usage
 The memory usage is recorded separately from the FPS. Each zone module is run individually for each test and the memory usage is recorded manually by opening the console and observing the Luau heap.
