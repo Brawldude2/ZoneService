@@ -5,8 +5,9 @@ Simple zone detection library with insane optimization.
 
 # Benchmarks
 [Code](https://github.com/breadboardengineer1234/ZoneService/tree/main/benchmarks)
-All tests are conducted with continuously moving entities. The first 4 tests are done with stationary zones.
+All tests are conducted with continuously moving entities. The first 4 tests are done with stationary zones. ZoneService and QuickZone are both run with a 30 Hz polling rate, Zoner is set to Immediate rate, ZonePlus is set to Precise rate, and SimplerZone is left at default.
 
+## ZoneService Perfermance Mode Off
 ### Light Test 1 (10K zones, 1 entity)
 | Library | FPS | Memory Usage (MB) |
 |--------------------|------------------------|--------------------|
@@ -24,45 +25,44 @@ All tests are conducted with continuously moving entities. The first 4 tests are
 | QuickZone | 240.00 | 4.75
 | **ZoneService** | **240.00** | **4.29** 
 
-## ZoneService Perfermance Mode Off
 Only ZoneService and QuickZone are fast enough to handle the following tests. The other libraries cause studio to crash. For all intents and purposes their FPS can be considered 0.
 ### Heavy Test 1 (10K zones, 10K entities)
 | Library | FPS | Memory Usage (MB) |
 |--------------------|------------------------|--------------------|
-| QuickZone | 21.30 | 28.39
-| **ZoneService** | **83.11** | **21.49** 
+| QuickZone | 21.60 | 28.39
+| **ZoneService** | **200.98** | **21.49** 
 
 ### Heavy Test 2 (1M zones, 500 entities)
 | Library | FPS | Memory Usage (MB) |
 |--------------------|------------------------|--------------------|
-| QuickZone | 12.91 | 1196.13
-| **ZoneService** | **65.05** | **889.26** 
+| QuickZone | 13.13 | 1196.13
+| **ZoneService** | **54.62** | **889.26** 
 
 ### Heavy Test 3 (10K dynamic zones, 10K entities)
 In this test the zones continuously move to different locations every frame.
 | Library | FPS | Memory Usage (MB) |
 |--------------------|------------------------|--------------------|
-| QuickZone | 14.90 | 28.62
-| **ZoneService** | **43.65** | **21.55** 
+| QuickZone | 14.97 | 28.62
+| **ZoneService** | **41.43** | **21.55** 
 
 ## ZoneService Performance Mode On
 ### Heavy Test 1 (10K zones, 10K entities)
 | Library | FPS | Effective Poll Rate (Hz) |
 |--------------------|------------------------|--------------------|
-| QuickZone | 21.30 | 21.30
+| QuickZone | 21.60 | 21.60
 | **ZoneService** | **221.90** | **28.54** 
 
 ### Heavy Test 2 (1M zones, 500 entities)
 | Library | FPS | Effective Poll Rate (Hz) |
 |--------------------|------------------------|--------------------|
-| QuickZone | 12.91 | 12.91
+| QuickZone | 13.13 | 13.13
 | **ZoneService** | **182.31** | **21.63** 
 
 ### Heavy Test 3 (10K dynamic zones, 10K entities)
 In this test the zones continuously move to different locations every frame.
 | Library | FPS | Effective Poll Rate (Hz) |
 |--------------------|------------------------|--------------------|
-| QuickZone | 14.90 | 14.90
+| QuickZone | 14.97 | 14.97
 | **ZoneService** | **54.05** | **16.49** 
 
 ## Initialization Test
