@@ -45,6 +45,8 @@ In this test the zones continuously move to different locations every frame.
 | **ZoneService** | **41.43** | **21.55** 
 
 ## ZoneService Performance Mode On
+Effective polling rate is the true polling rate. I wrote some special code in the backend of ZoneService that records the average number of visits of a random bucket during polling. This metric gives us the true polling rate when performance mode is on. For QuickZone no special code is needed as the true polling rate cannot be above the FPS.
+
 ### Heavy Test 1 (10K zones, 10K entities)
 | Library | FPS | Effective Poll Rate (Hz) |
 |--------------------|------------------------|--------------------|
