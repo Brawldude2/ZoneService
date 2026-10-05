@@ -24,8 +24,8 @@ All tests are conducted with continuously moving entities. The first 4 tests are
 | QuickZone | 240.00 | 4.75
 | **ZoneService** | **240.00** | **4.29** 
 
-Only ZoneService and QuickZone are fast enough to handle the following tests. The other libraries cause studio to crash. For all intents and purposes their FPS can be considered 0.
 ## ZoneService Perfermance Mode Off
+Only ZoneService and QuickZone are fast enough to handle the following tests. The other libraries cause studio to crash. For all intents and purposes their FPS can be considered 0.
 ### Heavy Test 1 (10K zones, 10K entities)
 | Library | FPS | Memory Usage (MB) |
 |--------------------|------------------------|--------------------|
