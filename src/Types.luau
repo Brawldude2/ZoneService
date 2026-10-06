@@ -50,35 +50,50 @@ export type ZoneInfo = {
 	InverseCFrame: CFrame?,
 	Pos: Vector3,
 
-	Groups: {Group},
-	Priority: number,
-	Dynamic: boolean,
+	observers: {Observer},
+	priority: number,
+	isDynamic: boolean,
 	metadata: any,
 	destroyed: boolean,
+	union: Zones,
 	
-	EnteredSignal: Signal<Entity>?,
-	ExitedSignal: Signal<Entity>?,
+	cachedEnteredSignal: any,
+	cachedExitedSignal: any,	
+	EnteredSignal: any,
+	ExitedSignal: any,
 }
 
 export type Zone = {
 	destroyed: boolean,
+	priority: number,
+	isDynamic: boolean,
 	metadata: any,
+	observers: {Observer},
+	
 	isPointInside: (self: Zone, point: Vector3) -> boolean,
 	getRandomPointInside: (self: Zone) -> Vector3,
 	setPriority: (self: Zone, priority: number) -> (),
 	update: (self: Zone, cframe: CFrame?, size: Vector3?) -> (),
-	onEnter: (self: Zone, callback: (entity: Entity) -> ()) -> Signal.Connection<Entity>,
-	onExit: (self: Zone, callback: (entity: Entity) -> ()) -> Signal.Connection<Entity>,
 	destroy: (self: Zone) -> (),
 }
 
-export type Group = {
+export type Zones = {
+	zones: {[Zone]: boolean},
+	add: (self: Zones, zone: Zone) -> (),
+	remove: (self: Zones, zone: Zone) -> (),
+	destroy: (self: Zones) -> (),
+}
+
+export type Observer = {
 	zones: {[Zone]: number},
 	entities: {[Entity]: EntityInfo},
 	
-	add: (self: Group, zone: Zone) -> (),
-	remove: (self: Group, zone: Zone) -> (),
-	destroy: (self: Group) -> (),
+	add: (self: Observer, zone: Zone) -> (),
+	remove: (self: Observer, zone: Zone) -> (),
+	onEnter: (self: Observer, zone: Zone | Zones, callback: (entity: Entity) -> ()) -> Signal.Connection<Entity>,
+	onExit: (self: Observer, zone: Zone | Zones, callback: (entity: Entity) -> ()) -> Signal.Connection<Entity>,
+	onZoneChange: (self: Observer, tracked: Tracked, callback: (zone: Zone?) -> ()) -> Signal.Connection<Zone?>,
+	destroy: (self: Observer) -> (),
 }
 
 export type Entity = Player? | Instance | {Position: Vector3}
@@ -90,15 +105,13 @@ export type EntityInfo = {
 	RootPart: BasePart?,
 	
 	Candidates: {ZoneInfo},
-	CurrZones: {[Group]: ZoneInfo},
-	PrevZones: {[Group]: ZoneInfo},
-	ChangedSignals: {[Group]: Signal<Zone?>},
+	CurrZones: {[Observer]: ZoneInfo},
+	PrevZones: {[Observer]: ZoneInfo},
+	ChangedSignals: {[Observer]: Signal<Zone?>},
 }
 
 export type Tracked = {
 	entity: Entity,
-	onZoneChange: (self: Tracked, group: Group, callback: (zone: Zone?) -> (), prefire: boolean?) -> 
-	Signal.Connection<Zone?>,
 	getZones: (self: Tracked) -> {Zone},
 }
 

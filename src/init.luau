@@ -11,18 +11,18 @@ Features:
 -Built in entity-centric and zone-centric signals
 -Supports multiple different shapes and rotated zones
 -Supports dynamic zones (cframe and size)
--Supports zone groups for independent zone signals
--Priority system to resolve overlapping zones within the same group
+-Supports observers for independent zone signals
+-Priority system to resolve overlapping zones under the same observer
 -Register entities and zones with simple API
 
 For best performance:
 -Do not have many overlapping zones
 -Track fewer entities
--Use a minimal # of dynamic zones (recommended < 1000)
--Use a minimal # of zone groups (recommended < 10)
--Avoid adding same zone to multiple groups
+-Use a minimal # of dynamic zones (recommended < 500)
+-Use a minimal # of observers (recommended < 10)
+-Avoid adding same zone to multiple observers
 -Use block zones with (0, 0, 0) orientation whenever possible
--Use a lower polling rate
+-Use a lower polling rate and turn on performance mode
 ]]
 
 local RunService = game:GetService("RunService")
@@ -33,10 +33,11 @@ local BVH = require(script.BVH)
 local Config = require(script.Config)
 local Signal = require(script.UsefulSignal)
 
-const VERSION = "v0.4.0"
+const VERSION = "v0.5.0"
 const SOURCE = "[ZoneService]"
 const DEFAULT_PRIORITY = Config.DefaultPriority
 const POLLING_RATE = Config.PollingRate
+const PERF_MODE = Config.PerformanceMode
 const NUM_BUCKETS = 10
 const ENUM_BLOCK = Enums.Block
 const ENUM_BALL = Enums.Ball
@@ -57,8 +58,9 @@ export type Params = Types.Params
 export type Entity = Types.Entity
 export type Shape = Types.Shape
 export type Zone = Types.Zone
-export type Group = Types.Group
+export type Zones = Types.Zones
 export type Tracked = Types.Tracked
+export type Observer = Types.Observer
 
 local function getFrameBuckets(numBuckets: number): {Bucket}
 	local buckets = table.create(numBuckets)	
@@ -147,19 +149,19 @@ local function wedgeBoundsCheck(point: Vector3, inverseCFrame: CFrame, slope: nu
 	local localPoint = inverseCFrame:PointToWorldSpace(point)
 	local x, y, z = localPoint.X, localPoint.Y, localPoint.Z
 	local halfX, halfY, halfZ = halfSize.X, halfSize.Y, halfSize.Z
-
+	
 	if x < -halfX or x > halfX then
 		return false
 	end
-
+	
 	if z < -halfZ or z > halfZ then
 		return false
 	end
-
+	
 	if y < -halfY then
 		return false
 	end	
-
+	
 	local yMax = -halfY + (z + halfZ) * slope
 	return y <= yMax
 end
@@ -173,11 +175,11 @@ local function cornerWedgeBoundsCheck(pos: Vector3, inverseCFrame: CFrame, slope
 	if x < -halfX or x > halfX then
 		return false
 	end
-
+	
 	if y < -halfY or y > halfY then
 		return false
 	end
-
+	
 	if z < -halfZ or z > halfZ then
 		return false		
 	end
@@ -223,12 +225,12 @@ local function updateBlock(cframe: CFrame, size: Vector3, info: ZoneInfo)
 	else
 		posLower, posUpper = getRotatedBlockAABB(cframe, size)
 	end
-
+	
 	info.PosLower = posLower
 	info.PosUpper = posUpper	
 	info.CFrame = cframe
 	info.Pos = position
-
+	
 	if not axisAligned then
 		info.InverseCFrame = cframe:Inverse()
 	end
@@ -285,62 +287,93 @@ local function updateTreeBounds(tree: Tree, zones: {[ZoneInfo]: boolean})
 	tree:setBounds(min, max)
 end
 
+local function getSignal(key: any, info: {[any]: any} | ZoneInfo | Observer): Signal<any>
+	local signal = info[key]
+	if not signal then
+		signal = Signal.new()
+		info[key] = signal
+	end
+	return signal
+end
+
 --API start
 local ZoneService = {}
 
 local Zone = {}
 Zone.__index = Zone
 
-local Group = {}
-Group.__index = Group
+local Zones = {}
+Zones.__index = Zones
+
+local Observer = {}
+Observer.__index = Observer
 
 local Tracked = {}
 Tracked.__index = Tracked
 
-ZoneService.Group = Group
-
-function Group.new(): Group
+local function newObserver(): Observer
 	return setmetatable({
 		zones = {},
 		entities = {},
-	}, Group) :: Group
+	}, Observer) :: Observer
 end
 
-const DEFAULT_GROUP: Group = Group.new()
-
-function Group.add(self: Group, zone: Zone)
-	if self.zones[zone] then return end 
-	local idx = 1
-	local groups = (zone :: ZoneInfo).Groups
-	if groups[1] == DEFAULT_GROUP then
-		DEFAULT_GROUP.zones[zone] = nil
-		groups[1] = self
-	else
-		local numGroups = #groups + 1
-		groups[numGroups] = self
-		idx = numGroups
-	end
-	self.zones[zone] = idx
+function Observer.add(self: Observer, zone: Zone)
+	local zones = self.zones
+	if zones[zone] then return end 
+	local observers = (zone :: ZoneInfo).observers
+	local idx = #observers + 1
+	observers[idx] = self
+	zones[zone] = idx
 end
 
-function Group.remove(self: Group, zone: Zone)
-	local idx = self.zones[zone]
+function Observer.remove(self: Observer, zone: Zone)
+	local zones = self.zones
+	local idx = zones[zone]
 	if not idx then return end
-	self.zones[zone] = nil
-	local groups = (zone :: ZoneInfo).Groups
-	local numGroups = #groups
-	if numGroups == 1 then
-		groups[1] = DEFAULT_GROUP
-		DEFAULT_GROUP.zones[zone] = 1
-		return
+	zones[zone] = nil
+	local observers = (zone :: ZoneInfo).observers
+	local numObservers = #observers
+	local last = observers[numObservers]
+	observers[numObservers] = nil
+	if idx ~= numObservers then
+		observers[idx] = last
+		last.zones[zone] = idx
 	end
-	local lastGroup = groups[numGroups]
-	groups[numGroups] = nil
-	groups[idx] = lastGroup
-	lastGroup.zones[zone] = idx
 end
 
-function Group.destroy(self: Group)
+function Observer.onEnter(self: Observer, zone: Zone | Zones, callback: (entity: Entity) -> ()): Signal.Connection<Entity>
+	local signal = getSignal("EnteredSignal", zone)
+	return signal:Connect(function(entity, observer)
+		if observer ~= self then return end 
+		callback(entity)
+	end)
+end
+
+function Observer.onExit(self: Observer, zone: Zone | Zones, callback: (entity: Entity) -> ()): Signal.Connection<Entity>
+	local signal = getSignal("ExitedSignal", zone)
+	return signal:Connect(function(entity, observer)
+		if observer ~= self then return end 
+		callback(entity)
+	end)
+end
+
+function Observer.onZoneChange(self: Observer, tracked: Tracked, callback: (zone: Zone?) -> (), prefire: boolean?)
+	: Signal.Connection<Zone?>
+	local entity = tracked.entity
+	local info = entitiesTracker[entity]
+	if not info then
+		error(`{SOURCE} Cannot observe onZoneChange on untracked entity`)
+	end
+	local signal = getSignal(self, info.ChangedSignals)	
+	if prefire ~= false then
+		callback(info.PrevZones[self] :: Zone?)
+	end	
+	self.entities[entity] = info
+	return signal:Connect(callback)
+end
+
+function Observer.destroy(self: Observer)
 	local entities = self.entities
 	for entity, info in entities do
 		local changedSignals = info.ChangedSignals
@@ -351,76 +384,101 @@ function Group.destroy(self: Group)
 		end	
 		entities[entity] = nil
 	end
-
+	
 	for zone, _ in self.zones do
 		self:remove(zone)
 	end
 	setmetatable(self, nil)
 end
 
+ZoneService.Observer = {new = newObserver}
+
 local function createZone(cframe: CFrame, size: Vector3, shape: Shape, params: 
 	{priority: number?, dynamic: boolean?, metadata: any}?)
-		: Zone
-		local info = {} :: ZoneInfo
-		if shape == "Block" then
-			info.Type = ENUM_BLOCK
-			updateBlock(cframe, size, info)
+	: Zone
+	local info = {} :: ZoneInfo
+	if shape == "Block" then
+		info.Type = ENUM_BLOCK
+		updateBlock(cframe, size, info)
 
-		elseif shape == "Ball" then
-			info.Type = ENUM_BALL
-			updateBall(cframe, size, info)
+	elseif shape == "Ball" then
+		info.Type = ENUM_BALL
+		updateBall(cframe, size, info)
 
-		elseif shape == "Cylinder" then
-			info.Type = ENUM_CYLINDER
-			updateCylinder(cframe, size, info)
+	elseif shape == "Cylinder" then
+		info.Type = ENUM_CYLINDER
+		updateCylinder(cframe, size, info)
 
-		elseif shape == "Wedge" then
-			info.Type = ENUM_WEDGE
-			updateWedge(cframe, size, info)
+	elseif shape == "Wedge" then
+		info.Type = ENUM_WEDGE
+		updateWedge(cframe, size, info)
 
-		elseif shape == "CornerWedge" then
-			info.Type = ENUM_CORNERWEDGE
-			updateCornerWedge(cframe, size, info)
+	elseif shape == "CornerWedge" then
+		info.Type = ENUM_CORNERWEDGE
+		updateCornerWedge(cframe, size, info)
 
-		else
-			error(`{SOURCE} Unsupported shape: {shape}`)
-		end
-		info.Size = size
-
-		local dynamic = false
-		local priority = DEFAULT_PRIORITY
-
-		if params then
-			dynamic = params.dynamic or dynamic
-			priority = params.priority or priority
-			info.metadata = params.metadata	
-		end
-
-		DEFAULT_GROUP.zones[info :: Zone] = 1
-		info.Groups = {DEFAULT_GROUP}
-		info.Priority = priority
-		info.Dynamic = dynamic
-		info.destroyed = false
-
-		if dynamic then
-			dynamicTree:updateBounds(info.PosLower, info.PosUpper)
-			dynamicZones[info] = true
-			numDynamicZones += 1
-			rebuildDynamic = true
-
-		else
-			zones[info] = true
-			numStaticZones += 1
-			rebuildStatic = true
-		end
-
-		return setmetatable(info, Zone) :: Zone
+	else
+		error(`{SOURCE} Unsupported shape: {shape}`)
 	end
+	info.Size = size
+
+	local dynamic = false
+	local priority = DEFAULT_PRIORITY
+	
+	if params then
+		dynamic = params.dynamic or dynamic
+		priority = params.priority or priority
+		info.metadata = params.metadata	
+	end
+	
+	info.observers = {}
+	info.priority = priority
+	info.isDynamic = dynamic
+	info.destroyed = false
+
+	if dynamic then
+		dynamicTree:updateBounds(info.PosLower, info.PosUpper)
+		dynamicZones[info] = true
+		numDynamicZones += 1
+		rebuildDynamic = true
+
+	else
+		zones[info] = true
+		numStaticZones += 1
+		rebuildStatic = true
+	end
+	
+	return setmetatable(info, Zone) :: Zone
+end
 
 ZoneService.new = createZone
 
 function ZoneService.fromPart(part: Part, params: {priority: number?, dynamic: boolean?, metadata: any}?): Zone
 	return createZone(part.CFrame, part.Size, part.Shape.Name :: Shape, params)
+end
+
+function ZoneService.fromZones(zones: {Zone}): Zones
+	local enterSignal, exitSignal = Signal.new(), Signal.new()
+	local unionZones = {}
+	local union = {
+		zones = unionZones,
+		EnteredSignal = enterSignal,
+		ExitedSignal = exitSignal
+	}
+	
+	for _, zone: any in zones do
+		if zone.union then
+			warn(`{SOURCE} Zone skipped: already in a collection`)
+			continue
+		end
+		zone.union = union
+		zone.cachedEnteredSignal = zone.EnteredSignal
+		zone.cachedExitedSignal = zone.ExitedSignal
+		zone.EnteredSignal = enterSignal
+		zone.ExitedSignal = exitSignal
+		unionZones[zone] = true
+	end	
+	return setmetatable(union, Zones) :: Zones
 end
 
 function ZoneService.isTracked(self: ZoneService, entity: Entity): boolean
@@ -432,7 +490,7 @@ function ZoneService.track(self: ZoneService, entity: Entity): Tracked
 	if info ~= nil then
 		error(`{SOURCE} Entity {entity} is already tracked`)
 	end
-
+	
 	local entityType
 	if type(entity) == "table" then
 		if not entity.Position then
@@ -460,13 +518,13 @@ function ZoneService.track(self: ZoneService, entity: Entity): Tracked
 	info.PrevZones = {}
 	info.ChangedSignals = {}
 	info.Active = true
-
+	
 	local bucketIdx = getSmallestBucket()
 	entities[bucketIdx][entity] = info
 	entitiesBucketIdx[entity] = bucketIdx
 	bucketSizes[bucketIdx] += 1
 	entitiesTracker[entity] = info
-
+	
 	return setmetatable({entity = entity}, Tracked) :: Tracked
 end
 
@@ -475,7 +533,7 @@ function ZoneService.untrack(self: ZoneService, entity: Entity)
 	if not bucketIdx then return end 	
 	local info = entitiesTracker[entity]
 	if not info then return end 
-
+	
 	info.Active = false
 	entitiesTracker[entity] = nil	
 	local bucketInfo = entities[bucketIdx]
@@ -484,10 +542,10 @@ function ZoneService.untrack(self: ZoneService, entity: Entity)
 	end
 	entitiesBucketIdx[entity] = nil
 	bucketSizes[bucketIdx] -= 1
-
-	for group, signal in info.ChangedSignals do
+	
+	for observer, signal in info.ChangedSignals do
 		signal:DisconnectAll()
-		group.entities[entity] = nil
+		observer.entities[entity] = nil
 	end
 end
 
@@ -536,6 +594,58 @@ function ZoneService.getZonesAtPoint(self: ZoneService, point: Vector3): {Zone}
 		table.insert(finalZones, info :: Zone)
 	end
 	return finalZones
+end
+
+function Zones.add(self: Zones, zone: Zone)
+	local zones = self.zones
+	if (zone :: any).union ~= nil then
+		warn(`{SOURCE} Failed to add zone to collection: already in one`)
+		return
+	end
+	zones[zone] = true
+	zone = zone :: any
+	zone.union = self
+	zone.cachedEnteredSignal = zone.EnteredSignal
+	zone.cachedExitedSignal = zone.ExitedSignal
+	zone.EnteredSignal = (self :: any).EnteredSignal
+	zone.ExitedSignal = (self :: any).ExitedSignal
+end
+
+function Zones.remove(self: Zones, zone: Zone)
+	local zones = self.zones
+	if not zones[zone] then return end 
+	zones[zone] = nil
+	zone = zone :: any
+	zone.union = nil
+	zone.EnteredSignal = zone.cachedEnteredSignal
+	zone.ExitedSignal = zone.cachedExitedSignal
+	zone.cachedEnteredSignal = nil
+	zone.cachedExitedSignal = nil
+end
+
+function Zones.destroy(self: Zones)
+	local exitSignal = (self :: any).ExitedSignal
+	local enterSignal = (self :: any).EnteredSignal
+	
+	for entity, info in entitiesTracker do
+		local prevZones = info.PrevZones
+		for observer, zone in prevZones do
+			if zone.union ~= self then continue end
+			if exitSignal then exitSignal:Fire(entity, observer) end
+			prevZones[observer] = nil
+		end
+	end
+	
+	for zone, _ in self.zones do
+		self:remove(zone)		
+	end
+	if exitSignal then
+		exitSignal:DisconnectAll()
+	end
+	if enterSignal then
+		enterSignal:DisconnectAll()
+	end
+	setmetatable(self, nil)
 end
 
 function Zone.isPointInside(self: Zone, point: Vector3): boolean
@@ -637,31 +747,32 @@ function Zone.destroy(self: Zone)
 	if not static and not dynamic then return end
 	zones[zone] = nil
 	dynamicZones[zone] = nil
-
+	
+	local observers = zone.observers	
+	local exitSignal = zone.ExitedSignal
+	for entity, entityInfo in entitiesTracker do
+		local prevZones = entityInfo.PrevZones
+		for _, observer in observers do
+			if prevZones[observer] ~= zone then continue end 
+			if exitSignal then exitSignal:Fire(entity, observer) end
+			prevZones[observer] = nil
+		end
+	end
+	local union = zone.union
+	if union then
+		union:remove(self)
+	end
+	if exitSignal then exitSignal:DisconnectAll() end
 	local enteredSignal = zone.EnteredSignal
 	if enteredSignal then
 		enteredSignal:DisconnectAll()
 	end
-
-	local groups = zone.Groups	
-	local exitSignal = zone.ExitedSignal
-	for entity, entityInfo in entitiesTracker do
-		local prevZones = entityInfo.PrevZones
-		for _, group in groups do
-			if prevZones[group] ~= zone then continue end 
-			if exitSignal then exitSignal:Fire(entity) end
-			prevZones[group] = nil
-		end
+	
+	while #observers > 0 do
+		local observer = observers[1]
+		observer:remove(zone :: Zone)
 	end
-	if exitSignal then exitSignal:DisconnectAll() end
-
-	while groups[1] ~= DEFAULT_GROUP do
-		local group = groups[#groups]
-		group:remove(zone :: Zone)
-	end
-	groups[1] = nil
-	DEFAULT_GROUP.zones[self] = nil
-
+	
 	if static then
 		rebuildStatic = true
 		numStaticZones -= 1
@@ -678,71 +789,47 @@ function Zone.update(self: Zone, cframe: CFrame?, size: Vector3?)
 	local static = zones[info]
 
 	cframe = cframe or info.CFrame
-	size = size or info.Size
+	if size then
+		info.Size = size
+	else
+		size = info.Size
+	end
 	local shape = info.Type
 
 	if shape == ENUM_BLOCK then
-		updateBlock(cframe, size, info)	
+		updateBlock(cframe, size :: Vector3, info)	
 
 	elseif shape == ENUM_BALL then
-		updateBall(cframe, size, info)
+		updateBall(cframe, size :: Vector3, info)
 
 	elseif shape == ENUM_CYLINDER then
-		updateCylinder(cframe, size, info)
+		updateCylinder(cframe, size :: Vector3, info)
 
 	elseif shape == ENUM_WEDGE then
-		updateWedge(cframe, size, info)
+		updateWedge(cframe, size :: Vector3, info)
 
 	else
-		updateCornerWedge(cframe, size, info)
+		updateCornerWedge(cframe, size :: Vector3, info)
 	end
 
 	if static then
 		rebuildStatic = true
-
-	else
+		
+	elseif dynamic then
 		dynamicTree:updateBounds(info.PosLower, info.PosUpper)
 		rebuildDynamic = true
 	end
 end
 
 function Zone.setPriority(self: Zone, priority: number)
-	(self :: ZoneInfo).Priority = priority
-end
-
-local function getSignal(key: any, info: {[any]: any} | ZoneInfo): Signal<any>
-	local signal = info[key]
-	if not signal then
-		signal = Signal.new()
-		info[key] = signal
-	end
-	return signal
-end
-
-function Zone.onEnter(self: Zone, callback: (entity: Entity) -> ()): Signal.Connection<Entity>
-	local signal = getSignal("EnteredSignal", self :: ZoneInfo)
-	return signal:Connect(callback)
-end
-
-function Zone.onExit(self: Zone, callback: (entity: Entity) -> ()): Signal.Connection<Entity>
-	local signal = getSignal("ExitedSignal", self :: ZoneInfo)
-	return signal:Connect(callback)
-end
-
-function Tracked.onZoneChange(self: Tracked, group: Group, callback: (zone: Zone?) -> (), prefire: boolean?)
-	: Signal.Connection<Zone?>
-	local entity = self.entity
-	local info = entitiesTracker[entity]
-	local signal = getSignal(group, info.ChangedSignals)	
-	if prefire ~= false then		
-		callback(info.PrevZones[group] :: Zone)
-	end	
-	group.entities[entity] = info
-	return signal:Connect(callback)
+	(self :: ZoneInfo).priority = priority
 end
 
 function Tracked.getZones(self: Tracked): {Zone}
 	local entityInfo = entitiesTracker[self.entity]
+	if not entityInfo then
+		error(`{SOURCE} Cannot call getZones on untracked entity`)
+	end
 	local zones = {}
 	for _, zone in entityInfo.PrevZones do
 		table.insert(zones, zone :: Zone)
@@ -750,32 +837,27 @@ function Tracked.getZones(self: Tracked): {Zone}
 	return zones
 end
 
-function ZoneService.ballSize(radius: number): Vector3
-	return Vector3.new(radius, radius, radius)
-end
-
-function ZoneService.cylinderSize(radius: number, height: number): Vector3
-	return Vector3.new(height, radius, radius)
-end
-
-local function resolvePriority(zone: ZoneInfo, currZones: {[Group]: ZoneInfo})
-	local priority = zone.Priority
-	for _, group in zone.Groups do
-		local currZone = currZones[group]
-		local current = if currZone then currZone.Priority else -math.huge
+local function resolvePriority(zone: ZoneInfo, currZones: {[Observer]: ZoneInfo})
+	local priority = zone.priority
+	for _, observer in zone.observers do
+		local currZone = currZones[observer]
+		local current = if currZone then currZone.priority else -math.huge
 
 		if priority > current then
-			currZones[group] = zone
+			currZones[observer] = zone
 		end
 	end
 end
 
 --Adaptive polling config
+const MIN_POLL_RATE = POLLING_RATE > 60 and 30 or POLLING_RATE / 2
 const HZ_THRESHOLD: number = 4
 const HISTORY_LEN: number = 40
-local interval: number = 5
+local interval: number = 4
 local historyDt: number = 0
 local historyFrames: number = 0
+local historyPollTime: number = 0
+local pollRate = POLLING_RATE
 local cursor: number = 1
 local accumulator: number = 0
 
@@ -795,32 +877,41 @@ local function poll(dt: number)
 		deferred = false
 		return
 	end
-
+	
+	local t0 = os.clock()	
 	if rebuildDynamic then
 		dynamicTree:build(dynamicZones, numDynamicZones)
 		rebuildDynamic = false
 	end
-
+	
 	if historyFrames >= HISTORY_LEN then
-		local fps = historyFrames / historyDt
-		local avgHz = fps / interval	
+		local avgHz = (historyFrames / historyDt) / interval
+		
+		if PERF_MODE then
+			local pollFps = historyFrames / historyPollTime
+			if pollRate < POLLING_RATE and pollFps > 260 then
+				pollRate = math.min(pollRate + 2, POLLING_RATE)
+			elseif pollFps < 240 then
+				pollRate = math.max(pollRate - 2, MIN_POLL_RATE)
+			end
+		end
 
-		if avgHz - POLLING_RATE > HZ_THRESHOLD then
+		if avgHz - pollRate > HZ_THRESHOLD then
 			interval = math.min(interval + 1, NUM_BUCKETS)
-
-		elseif POLLING_RATE - avgHz > HZ_THRESHOLD then
+			
+		elseif pollRate - avgHz > HZ_THRESHOLD then
 			interval = math.max(interval - 1, 1)
 		end
 		historyFrames = 0
 		historyDt = 0
-	end
-
+		historyPollTime = 0
+	end	
 	historyFrames += 1
 	historyDt += dt
 	accumulator += NUM_BUCKETS / interval
-
+	
 	while accumulator >= 1 do
-		accumulator -= 1		
+		accumulator -= 1
 		for entity: Entity, entityInfo: EntityInfo in entities[cursor] do
 			if not entityInfo.Active or not entity then
 				continue
@@ -868,35 +959,51 @@ local function poll(dt: number)
 				if not checkInZone(pos, zone) then
 					continue
 				end
-
 				resolvePriority(zone, entCurrZones)
 			end
-
+			
 			--update entity's zones/fire signals		
-			for group, zone: ZoneInfo in entPrevZones do
-				if zone == entCurrZones[group] then continue end				
+			for observer, zone: ZoneInfo in entPrevZones do
+				local currZone = entCurrZones[observer]
+				if zone == currZone then continue end				
 				local exitSignal = zone.ExitedSignal
-				if exitSignal then exitSignal:Fire(entity) end			
-				local changedSignal = entChangedSignals[group]
-				if changedSignal then changedSignal:Fire(nil) end		
-				entPrevZones[group] = nil
+				if exitSignal then
+					local zoneUnion = zone.union
+					if zoneUnion == nil or currZone == nil or zoneUnion ~= currZone.union then
+						exitSignal:Fire(entity, observer) 
+					end
+				end
+				if not currZone then
+					local changedSignal = entChangedSignals[observer]
+					if changedSignal then changedSignal:Fire(nil) end
+				end
+				if not currZone then 
+					entPrevZones[observer] = nil
+				end
 			end
 
-			for group, zone: ZoneInfo in entCurrZones do
-				if zone == entPrevZones[group] then continue end 
+			for observer, zone: ZoneInfo in entCurrZones do
+				local prevZone = entPrevZones[observer]
+				if zone == prevZone then continue end 
 				local enterSignal = zone.EnteredSignal
-				if enterSignal then enterSignal:Fire(entity) end 
-				local changedSignal = entChangedSignals[group]
-				if changedSignal then changedSignal:Fire(zone :: Zone) end			
-				entPrevZones[group] = zone
+				if enterSignal then
+					local zoneUnion = zone.union
+					if zoneUnion == nil or prevZone == nil or zoneUnion ~= prevZone.union then
+						enterSignal:Fire(entity, observer) 
+					end
+				end
+				local changedSignal = entChangedSignals[observer]
+				if changedSignal then changedSignal:Fire(zone :: Zone) end	
+				entPrevZones[observer] = zone
 			end			
 		end
-
+		
 		cursor += 1
 		if cursor > NUM_BUCKETS then
 			cursor = 1
 		end
 	end
+	historyPollTime += os.clock() - t0
 end
 
 function ZoneService.stopPoll(self: ZoneService)
@@ -925,19 +1032,19 @@ end
 
 function ZoneService.destroy(self: ZoneService)
 	self:stopPoll()
-
+	
 	for entity, _ in entitiesTracker do
 		self:untrack(entity)
 	end
-
+	
 	for zone, _ in zones do
 		(zone :: Zone):destroy()
 	end
-
+	
 	for zone, _ in dynamicZones do
 		(zone :: Zone):destroy()
 	end
-
+	
 	numStaticZones = 0
 	numDynamicZones = 0
 	rebuildStatic = false
