@@ -765,14 +765,14 @@ function ZoneService.CylinderSize(radius: number, height: number): Vector3
 	return Vector3.new(height, radius, radius)
 end
 
-local function ResolvePriority(zone: ZoneInfo, currZones: {[Group]: ZoneInfo})
+local function ResolvePriority(zone: ZoneInfo, currentZones: {[Group]: ZoneInfo})
 	local priority = zone.Priority
 	for _, group in zone.Groups do
-		local currZone = currZones[group]
-		local current = if currZone then currZone.Priority else -math.huge
+		local currentZone = currentZones[group]
+		local current = if currentZone then currentZone.Priority else -math.huge
 
 		if priority > current then
-			currZones[group] = zone
+			currentZones[group] = zone
 		end
 	end
 end
@@ -867,22 +867,29 @@ local function Poll(dt: number)
 				ResolvePriority(zone, currentEntityZones)
 			end
 
-			for group, zone: ZoneInfo in previousEntityZones do
+			for group, previousZone: ZoneInfo in previousEntityZones do
 				local currentZone = currentEntityZones[group]
-				if zone == currentZone then continue end		
+				if previousZone == currentZone then continue end		
 				
-				FireSignal(zone.Exited, entity)
+				FireSignal(previousZone.Exited, entity)
+				
+				-- Carry the previous zone information over to the entry checker loop
 				if not currentZone then
 					FireSignal(entityChangedSignals[group], nil)
+					previousEntityZones[group] = nil
 				end
-				previousEntityZones[group] = nil
 			end
 
-			for group, zone: ZoneInfo in currentEntityZones do
-				if zone == previousEntityZones[group] then continue end 
-				FireSignal(zone.Entered, entity)
-				FireSignal(entityChangedSignals[group], (zone :: any) :: Zone)
-				previousEntityZones[group] = zone
+			for group, currentZone: ZoneInfo in currentEntityZones do
+				local previousZone = previousEntityZones[group]
+				if currentZone == previousZone then continue end
+				
+				FireSignal(currentZone.Entered, entity)
+				if not previousZone or previousZone.UnionId ~= currentZone.UnionId then
+					FireSignal(entityChangedSignals[group], (currentZone :: any) :: Zone)
+				end
+				
+				previousEntityZones[group] = currentZone
 			end			
 		end
 

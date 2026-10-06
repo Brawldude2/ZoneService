@@ -51,7 +51,8 @@ export type ZoneInfo = {
 	CFrame: CFrame,
 	InverseCFrame: CFrame?,
 	Position: Vector3,
-
+	
+	UnionId: number,
 	Groups: {Group},
 	Priority: number,
 	Dynamic: boolean,
