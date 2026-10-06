@@ -1,3 +1,4 @@
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -78,20 +79,23 @@ local function setupQuickZone(numSubjects: number, numZones: number, abstractSub
 
 	local zones = table.create(numZones) :: {QuickZone.Zone}
 	for i = 1, numZones do
+
 		local zone = Zone.new({cframe = CFrame.new(getRandomPos()), size = SIZE, shape = "Block", isDynamic = dynamic})
 		observer:attach(zone)
 		broom:add(zone, "destroy")
 		zones[i] = zone
 	end
+
 	observer:subscribe(entities)
 	broom:add(entities, "destroy")
 	broom:add(observer, "destroy")
+	
 	
 	local function moveZones()
 		local elapsed = 0
 		for _, zone in zones do
 			local t0 = os.clock()
-			local cframe = getRandomCFrame()
+			local cframe = getRandomCFrame(false)
 			elapsed += os.clock() - t0
 			zone:setCFrame(cframe)
 		end
@@ -103,26 +107,28 @@ end
 local function setupZoneService(numSubjects: number, numZones: number, abstractSubjects: boolean?, dynamic: boolean?)
 	: ({BasePart} | {{Position: Vector3}}, () -> ())
 	local subjects = abstractSubjects and createAbstractSubjects(numSubjects) or createPartSubjects(numSubjects)
+	
 	for _, subj in subjects do
 		ZoneService:track(subj)
-	end
-	
-	local keys = table.create(numZones) :: {string}
+	end	
+	local observer = ZoneService.Observer.new()
+	local zones = table.create(numZones)
 	
 	for i = 1, numZones do
-		local key = "Zone"..i
-		ZoneService:addZone(key, GROUP, CFrame.new(getRandomPos()), SIZE, "Block", {Dynamic = dynamic})
-		keys[i] = key
+		local cframe = CFrame.new(getRandomPos())
+		local zone = ZoneService.new(cframe, SIZE, "Block", {dynamic = dynamic})
+		observer:add(zone)
+		zones[i] = zone
 	end
 	broom:add(ZoneService, "destroy")
 	
 	local function moveZones()
 		local elapsed = 0
-		for _, key in keys do
+		for _, zone: ZoneService.Zone in zones do
 			local t0 = os.clock()
 			local cframe = getRandomCFrame()
 			elapsed += os.clock() - t0
-			ZoneService:updateZone(key, cframe)
+			zone:update(cframe)
 		end
 		return elapsed
 	end
@@ -173,6 +179,7 @@ local function setupSimplerZone(numSubjects: number, numZones: number): {BasePar
 		precision = "BoundingBox", 
 		queryShape = "Point"
 	})
+	
 	broom:add(track, "clear")
 	broom:add(listener, "cleanup")
 	
@@ -189,9 +196,9 @@ local function setupZoner(numSubjects: number, numZones: number): {BasePart}
 		DetectionMode = Zoner.Enum.DetectionMode.Point,
 
 		Simulation = Zoner.Enum.Simulation.PostSimulation,
-		Execution = Zoner.Enum.Execution.Serial,
+		Execution = Zoner.Enum.Execution.Parallel,
 		Bounds = Zoner.Enum.Bounds.BoxExact,
-		Rate = Zoner.Enum.Rate.Fast,
+		Rate = Zoner.Enum.Rate.Faster,
 	}
 
 	for i = 1, numZones do
@@ -265,9 +272,10 @@ local function test(name: string, numSubjects: number, numZones: number, abstrac
 end
 
 local function initZoneService(numZones: number)
+	local observer = ZoneService.Observer.new()
 	for i = 1, numZones do
-		local key = "Zone"..i
-		ZoneService:addZone(key, GROUP, CFrame.new(), SIZE, "Block")
+		local zone = ZoneService.new(CFrame.new(), SIZE, "Block")
+		observer:add(zone)
 	end
 end
 
@@ -279,7 +287,6 @@ local function initQuickZone(numZones: number)
 	})
 	
 	for i = 1, numZones do
-		local key = "Zone"..i
 		local zone = Zone.new({cframe = CFrame.new(), size = SIZE, shape = "Block"})
 		observer:attach(zone)
 	end
@@ -314,7 +321,7 @@ local function initZoner(numZones: number)
 		Simulation = Zoner.Enum.Simulation.PostSimulation,
 		Execution = Zoner.Enum.Execution.Serial,
 		Bounds = Zoner.Enum.Bounds.BoxExact,
-		Rate = Zoner.Enum.Rate.Fast,
+		Rate = Zoner.Enum.Rate.Immediate,
 	}
 
 	for i = 1, numZones do
@@ -383,3 +390,4 @@ local function heavyTest3()
 end
 
 --RUN (call functions here)
+
