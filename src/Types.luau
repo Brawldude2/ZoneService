@@ -70,30 +70,30 @@ export type Zone = {
 	metadata: any,
 	observers: {Observer},
 	
-	isPointInside: (self: Zone, point: Vector3) -> boolean,
-	getRandomPointInside: (self: Zone) -> Vector3,
-	setPriority: (self: Zone, priority: number) -> (),
-	update: (self: Zone, cframe: CFrame?, size: Vector3?) -> (),
-	destroy: (self: Zone) -> (),
+	IsPointInside: (self: Zone, point: Vector3) -> boolean,
+	GetRandomPointInside: (self: Zone) -> Vector3,
+	SetPriority: (self: Zone, priority: number) -> (),
+	Update: (self: Zone, cframe: CFrame?, size: Vector3?) -> (),
+	Destroy: (self: Zone) -> (),
 }
 
 export type Zones = {
 	zones: {[Zone]: boolean},
-	add: (self: Zones, zone: Zone) -> (),
-	remove: (self: Zones, zone: Zone) -> (),
-	destroy: (self: Zones) -> (),
+	Add: (self: Zones, zone: Zone) -> (),
+	Remove: (self: Zones, zone: Zone) -> (),
+	Destroy: (self: Zones) -> (),
 }
 
 export type Observer = {
 	zones: {[Zone]: number},
 	entities: {[Entity]: EntityInfo},
 	
-	add: (self: Observer, zone: Zone) -> (),
-	remove: (self: Observer, zone: Zone) -> (),
-	onEnter: (self: Observer, zone: Zone | Zones, callback: (entity: Entity) -> ()) -> Signal.Connection<Entity>,
-	onExit: (self: Observer, zone: Zone | Zones, callback: (entity: Entity) -> ()) -> Signal.Connection<Entity>,
-	onZoneChange: (self: Observer, tracked: Tracked, callback: (zone: Zone?) -> ()) -> Signal.Connection<Zone?>,
-	destroy: (self: Observer) -> (),
+	Add: (self: Observer, zone: Zone) -> (),
+	Remove: (self: Observer, zone: Zone) -> (),
+	OnEnter: (self: Observer, zone: Zone | Zones, callback: (entity: Entity) -> ()) -> Signal.Connection<Entity>,
+	OnExit: (self: Observer, zone: Zone | Zones, callback: (entity: Entity) -> ()) -> Signal.Connection<Entity>,
+	OnZoneChange: (self: Observer, tracked: Tracked, callback: (zone: Zone?) -> ()) -> Signal.Connection<Zone?>,
+	Destroy: (self: Observer) -> (),
 }
 
 export type Entity = Player? | Instance | {Position: Vector3}
@@ -112,7 +112,7 @@ export type EntityInfo = {
 
 export type Tracked = {
 	entity: Entity,
-	getZones: (self: Tracked) -> {Zone},
+	GetZones: (self: Tracked) -> {Zone},
 }
 
 export type Shape = "Block" | "Ball" | "Cylinder" | "Wedge" | "CornerWedge"

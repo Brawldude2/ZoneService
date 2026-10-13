@@ -318,7 +318,7 @@ local function newObserver(): Observer
 	}, Observer) :: Observer
 end
 
-function Observer.add(self: Observer, zone: Zone)
+function Observer.Add(self: Observer, zone: Zone)
 	local zones = self.zones
 	if zones[zone] then return end 
 	local observers = (zone :: ZoneInfo).observers
@@ -327,7 +327,7 @@ function Observer.add(self: Observer, zone: Zone)
 	zones[zone] = idx
 end
 
-function Observer.remove(self: Observer, zone: Zone)
+function Observer.Remove(self: Observer, zone: Zone)
 	local zones = self.zones
 	local idx = zones[zone]
 	if not idx then return end
@@ -342,7 +342,7 @@ function Observer.remove(self: Observer, zone: Zone)
 	end
 end
 
-function Observer.onEnter(self: Observer, zone: Zone | Zones, callback: (entity: Entity) -> ()): Signal.Connection<Entity>
+function Observer.OnEnter(self: Observer, zone: Zone | Zones, callback: (entity: Entity) -> ()): Signal.Connection<Entity>
 	local signal = getSignal("EnteredSignal", zone)
 	return signal:Connect(function(entity, observer)
 		if observer ~= self then return end 
@@ -350,7 +350,7 @@ function Observer.onEnter(self: Observer, zone: Zone | Zones, callback: (entity:
 	end)
 end
 
-function Observer.onExit(self: Observer, zone: Zone | Zones, callback: (entity: Entity) -> ()): Signal.Connection<Entity>
+function Observer.OnExit(self: Observer, zone: Zone | Zones, callback: (entity: Entity) -> ()): Signal.Connection<Entity>
 	local signal = getSignal("ExitedSignal", zone)
 	return signal:Connect(function(entity, observer)
 		if observer ~= self then return end 
@@ -358,12 +358,12 @@ function Observer.onExit(self: Observer, zone: Zone | Zones, callback: (entity: 
 	end)
 end
 
-function Observer.onZoneChange(self: Observer, tracked: Tracked, callback: (zone: Zone?) -> (), prefire: boolean?)
+function Observer.OnZoneChange(self: Observer, tracked: Tracked, callback: (zone: Zone?) -> (), prefire: boolean?)
 	: Signal.Connection<Zone?>
 	local entity = tracked.entity
 	local info = entitiesTracker[entity]
 	if not info then
-		error(`{SOURCE} Cannot observe onZoneChange on untracked entity`)
+		error(`{SOURCE} Cannot observe OnZoneChange on untracked entity`)
 	end
 	local signal = getSignal(self, info.ChangedSignals)	
 	if prefire ~= false then
@@ -373,7 +373,7 @@ function Observer.onZoneChange(self: Observer, tracked: Tracked, callback: (zone
 	return signal:Connect(callback)
 end
 
-function Observer.destroy(self: Observer)
+function Observer.Destroy(self: Observer)
 	local entities = self.entities
 	for entity, info in entities do
 		local changedSignals = info.ChangedSignals
@@ -386,7 +386,7 @@ function Observer.destroy(self: Observer)
 	end
 	
 	for zone, _ in self.zones do
-		self:remove(zone)
+		self:Remove(zone)
 	end
 	setmetatable(self, nil)
 end
@@ -481,11 +481,11 @@ function ZoneService.fromZones(zones: {Zone}): Zones
 	return setmetatable(union, Zones) :: Zones
 end
 
-function ZoneService.isTracked(self: ZoneService, entity: Entity): boolean
+function ZoneService.IsTracked(self: ZoneService, entity: Entity): boolean
 	return entitiesTracker[entity] ~= nil
 end
 
-function ZoneService.track(self: ZoneService, entity: Entity): Tracked
+function ZoneService.Track(self: ZoneService, entity: Entity): Tracked
 	local info = entitiesTracker[entity]
 	if info ~= nil then
 		error(`{SOURCE} Entity {entity} is already tracked`)
@@ -494,7 +494,7 @@ function ZoneService.track(self: ZoneService, entity: Entity): Tracked
 	local entityType
 	if type(entity) == "table" then
 		if not entity.Position then
-			error(`{SOURCE} Failed to track table entity: missing Position field`)
+			error(`{SOURCE} Failed to Track table entity: missing Position field`)
 		end
 		entityType = ENUM_OTHER
 
@@ -528,7 +528,7 @@ function ZoneService.track(self: ZoneService, entity: Entity): Tracked
 	return setmetatable({entity = entity}, Tracked) :: Tracked
 end
 
-function ZoneService.untrack(self: ZoneService, entity: Entity)
+function ZoneService.Untrack(self: ZoneService, entity: Entity)
 	local bucketIdx = entitiesBucketIdx[entity]
 	if not bucketIdx then return end 	
 	local info = entitiesTracker[entity]
@@ -581,7 +581,7 @@ local function checkInZone(pos: Vector3, info: ZoneInfo): boolean
 	return inBounds
 end
 
-function ZoneService.getZonesAtPoint(self: ZoneService, point: Vector3): {Zone}
+function ZoneService.GetZonesAtPoint(self: ZoneService, point: Vector3): {Zone}
 	local zones = {}
 	staticTree:query(point, zones)
 	dynamicTree:query(point, zones)
@@ -596,10 +596,10 @@ function ZoneService.getZonesAtPoint(self: ZoneService, point: Vector3): {Zone}
 	return finalZones
 end
 
-function Zones.add(self: Zones, zone: Zone)
+function Zones.Add(self: Zones, zone: Zone)
 	local zones = self.zones
 	if (zone :: any).union ~= nil then
-		warn(`{SOURCE} Failed to add zone to collection: already in one`)
+		warn(`{SOURCE} Failed to Add zone to collection: already in one`)
 		return
 	end
 	zones[zone] = true
@@ -611,7 +611,7 @@ function Zones.add(self: Zones, zone: Zone)
 	zone.ExitedSignal = (self :: any).ExitedSignal
 end
 
-function Zones.remove(self: Zones, zone: Zone)
+function Zones.Remove(self: Zones, zone: Zone)
 	local zones = self.zones
 	if not zones[zone] then return end 
 	zones[zone] = nil
@@ -623,7 +623,7 @@ function Zones.remove(self: Zones, zone: Zone)
 	zone.cachedExitedSignal = nil
 end
 
-function Zones.destroy(self: Zones)
+function Zones.Destroy(self: Zones)
 	local exitSignal = (self :: any).ExitedSignal
 	local enterSignal = (self :: any).EnteredSignal
 	
@@ -637,7 +637,7 @@ function Zones.destroy(self: Zones)
 	end
 	
 	for zone, _ in self.zones do
-		self:remove(zone)		
+		self:Remove(zone)		
 	end
 	if exitSignal then
 		exitSignal:DisconnectAll()
@@ -648,7 +648,7 @@ function Zones.destroy(self: Zones)
 	setmetatable(self, nil)
 end
 
-function Zone.isPointInside(self: Zone, point: Vector3): boolean
+function Zone.IsPointInside(self: Zone, point: Vector3): boolean
 	return checkInZone(point, self :: ZoneInfo)
 end
 
@@ -656,7 +656,7 @@ local function randomFloat(min: number, max: number): number
 	return min + math.random() * (max - min)
 end
 
-function Zone.getRandomPointInside(self: Zone): Vector3
+function Zone.GetRandomPointInside(self: Zone): Vector3
 	local info = self :: ZoneInfo
 	local shape = info.Type
 	if shape == ENUM_BLOCK then
@@ -739,7 +739,7 @@ function Zone.getRandomPointInside(self: Zone): Vector3
 	end
 end
 
-function Zone.destroy(self: Zone)
+function Zone.Destroy(self: Zone)
 	if self.destroyed then return end 
 	self.destroyed = true
 	local zone = self :: ZoneInfo
@@ -760,7 +760,7 @@ function Zone.destroy(self: Zone)
 	end
 	local union = zone.union
 	if union then
-		union:remove(self)
+		union:Remove(self)
 	end
 	if exitSignal then exitSignal:DisconnectAll() end
 	local enteredSignal = zone.EnteredSignal
@@ -770,7 +770,7 @@ function Zone.destroy(self: Zone)
 	
 	while #observers > 0 do
 		local observer = observers[1]
-		observer:remove(zone :: Zone)
+		observer:Remove(zone :: Zone)
 	end
 	
 	if static then
@@ -783,7 +783,7 @@ function Zone.destroy(self: Zone)
 	setmetatable(self, nil)
 end
 
-function Zone.update(self: Zone, cframe: CFrame?, size: Vector3?)
+function Zone.Update(self: Zone, cframe: CFrame?, size: Vector3?)
 	local info = self :: ZoneInfo
 	local dynamic = dynamicZones[info]
 	local static = zones[info]
@@ -821,14 +821,14 @@ function Zone.update(self: Zone, cframe: CFrame?, size: Vector3?)
 	end
 end
 
-function Zone.setPriority(self: Zone, priority: number)
+function Zone.SetPriority(self: Zone, priority: number)
 	(self :: ZoneInfo).priority = priority
 end
 
-function Tracked.getZones(self: Tracked): {Zone}
+function Tracked.GetZones(self: Tracked): {Zone}
 	local entityInfo = entitiesTracker[self.entity]
 	if not entityInfo then
-		error(`{SOURCE} Cannot call getZones on untracked entity`)
+		error(`{SOURCE} Cannot call GetZones on untracked entity`)
 	end
 	local zones = {}
 	for _, zone in entityInfo.PrevZones do
@@ -962,7 +962,7 @@ local function poll(dt: number)
 				resolvePriority(zone, entCurrZones)
 			end
 			
-			--update entity's zones/fire signals		
+			--Update entity's zones/fire signals		
 			for observer, zone: ZoneInfo in entPrevZones do
 				local currZone = entCurrZones[observer]
 				if zone == currZone then continue end				
@@ -1006,43 +1006,43 @@ local function poll(dt: number)
 	historyPollTime += os.clock() - t0
 end
 
-function ZoneService.stopPoll(self: ZoneService)
+function ZoneService.StopPoll(self: ZoneService)
 	if pollConnection then
 		pollConnection:Disconnect()
 		pollConnection = nil
 	end
 end
 
-function ZoneService.startPoll(self: ZoneService)
+function ZoneService.StartPoll(self: ZoneService)
 	if pollConnection then return end
 	pollConnection = RunService.Heartbeat:Connect(poll)
 end
 
-function ZoneService.rebuildStaticBVH(self: ZoneService)
+function ZoneService.RebuildStaticBVH(self: ZoneService)
 	rebuildStatic = true
 end
 
-function ZoneService.rebuildDynamicBVH(self: ZoneService)
+function ZoneService.RebuildDynamicBVH(self: ZoneService)
 	rebuildDynamic = true
 end
 
-function ZoneService.updateDynamicBounds(self: ZoneService)
+function ZoneService.UpdateDynamicBounds(self: ZoneService)
 	updateTreeBounds(dynamicTree, dynamicZones)
 end
 
-function ZoneService.destroy(self: ZoneService)
-	self:stopPoll()
+function ZoneService.Destroy(self: ZoneService)
+	self:StopPoll()
 	
 	for entity, _ in entitiesTracker do
-		self:untrack(entity)
+		self:Untrack(entity)
 	end
 	
 	for zone, _ in zones do
-		(zone :: Zone):destroy()
+		(zone :: Zone):Destroy()
 	end
 	
 	for zone, _ in dynamicZones do
-		(zone :: Zone):destroy()
+		(zone :: Zone):Destroy()
 	end
 	
 	numStaticZones = 0
